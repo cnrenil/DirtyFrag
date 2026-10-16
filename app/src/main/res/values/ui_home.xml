@@ -4,7 +4,8 @@
     <string name="home_subtitle">Root status and device overview</string>
     <string name="home_manager_group">SU manager</string>
     <string name="home_kernel_group">Kernel overview</string>
-    <string name="home_log_group">Execution log</string>
+    <string name="home_log_group">This run</string>
+    <string name="home_log_running">This run (in progress)</string>
     <string name="home_open_manager">Open manager</string>
     <string name="home_running_hint">Keep the app open while the current operation completes.</string>
     <string name="home_rooted_hint">Root is available. Open your manager to manage access.</string>
@@ -13,6 +14,9 @@
     <string name="home_confirm_hint">Tap Confirm execution to start with the current configuration.</string>
     <string name="home_ready_hint">Your SU manager is selected. Ready to run.</string>
     <string name="home_confirm_run">Confirm execution</string>
-    <string name="home_log_empty">No execution log yet. Output will appear here when you run.</string>
+    <string name="home_rerun_title">Run again</string>
+    <string name="home_rerun_warning">Running again is very likely to fail.</string>
+    <string name="home_rerun_continue">Run anyway</string>
+    <string name="home_log_empty">No log for this run yet. Previous logs are on the Script modules tab.</string>
     <string name="manager_picker_summary">Choose an installed app that supplies a supported SU library.</string>
 </resources>

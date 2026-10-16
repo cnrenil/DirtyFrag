@@ -113,6 +113,8 @@ static void ensure_dir(const char *path, mode_t mode)
     chmod(path, mode);
 }
 
+static void step_log(const char *fmt, ...);
+
 /* Creates a marker file readable by the app.
  *
  * Markers are created *then* chowned, so use O_CREAT rather than relying on an
@@ -126,6 +128,59 @@ static void touch(const char *path)
         chmod(path, 0600);
         close(fd);
     }
+}
+
+/* Bind a marker to this boot. First line is the live boot id; extra is payload. */
+static void write_marker(const char *path, const char *id, const char *extra)
+{
+    int fd = open(path, O_CREAT | O_TRUNC | O_WRONLY | O_CLOEXEC, 0600);
+    if (fd < 0) return;
+    if (id && id[0]) {
+        ssize_t w = write(fd, id, strlen(id));
+        (void)w;
+        if (extra && extra[0]) {
+            w = write(fd, "\n", 1);
+            (void)w;
+            w = write(fd, extra, strlen(extra));
+            (void)w;
+        }
+    }
+    close(fd);
+    app_chown(path);
+    chmod(path, 0600);
+}
+
+static void mark_msg(const char *name, const char *extra)
+{
+    char path[256];
+    char id[80];
+    int n = snprintf(path, sizeof(path), "%s/%s", MARKER_DIR, name);
+    if (n <= 0 || (size_t)n >= sizeof(path)) return;
+    if (dfctl_live_boot_id(id, sizeof id) != 0) id[0] = '\0';
+    write_marker(path, id, extra);
+    write_marker(MARKER("boot_id"), id, NULL);
+}
+
+static void mark(const char *name)
+{
+    mark_msg(name, NULL);
+}
+
+static int selinux_enforcing(void)
+{
+    char buf[8];
+    if (dfctl_read_trimmed("/sys/fs/selinux/enforce", buf, sizeof buf) != 0)
+        return 0;
+    return buf[0] == '1';
+}
+
+static int stop_if_enforcing(void)
+{
+    if (!selinux_enforcing()) return 0;
+    step_log("SELinux is enforcing; daemon exiting");
+    g_stop = 1;
+    unlink(DAEMON_READY);
+    return 1;
 }
 
 /* Appends a step trace line to the daemon's own log, owned by the app. */
@@ -740,35 +795,6 @@ static int cleanup_unlink(const char *path)
     return -1;
 }
 
-/* Remove entries only, never recurse or follow directory/symlink targets. */
-static int cleanup_markers(const char *directory, const char *prefix)
-{
-    DIR *dir = opendir(directory);
-    if (!dir) {
-        if (errno == ENOENT) return 0;
-        step_log("cleanup: open %s failed: %s", directory, strerror(errno));
-        return -1;
-    }
-    int failed = 0;
-    struct dirent *entry;
-    while (1) {
-        errno = 0;
-        entry = readdir(dir);
-        if (!entry) {
-            if (errno) { step_log("cleanup: scan %s failed: %s", directory, strerror(errno)); failed = 1; }
-            break;
-        }
-        if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, "..")) continue;
-        if (prefix && strncmp(entry->d_name, prefix, strlen(prefix))) continue;
-        char path[512];
-        int n = snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
-        if (n > 0 && (size_t)n < sizeof(path)) failed |= cleanup_unlink(path) != 0;
-        else { step_log("cleanup: skipped overlong marker path"); failed = 1; }
-    }
-    closedir(dir);
-    return failed ? -1 : 0;
-}
-
 static int cleanup_runtime(int keep_reply, int remove_logs, int stop_daemon)
 {
     if (stop_daemon) g_stop = 1;
@@ -778,8 +804,6 @@ static int cleanup_runtime(int keep_reply, int remove_logs, int stop_daemon)
     int failed = 0;
     failed |= cleanup_unlink(DAEMON_READY) != 0;
     failed |= cleanup_unlink(DAEMON_PID) != 0;
-    failed |= cleanup_markers(MARKER_DIR, NULL) != 0;
-    failed |= cleanup_markers("/dev", "df") != 0;
     step_log("cleanup complete: result=%s; logs %s", failed ? "failed" : "ok", remove_logs ? "will be removed" : "retained");
     if (remove_logs) {
         failed |= cleanup_unlink(DAEMON_LOG) != 0;
@@ -901,11 +925,13 @@ static void plan_status(const char *id, const char *state, int exitcode, const c
     rename(tmp, PLAN_STATUS);
     app_chown(PLAN_STATUS);
     if (state && !strcmp(state, "done"))
-        touch(MARKER("plan-done"));
-    if (state && !strcmp(state, "accepted"))
-        touch(MARKER("plan-accepted"));
+        mark("plan-done");
+    if (state && !strcmp(state, "accepted")) {
+        mark("plan-accepted");
+        mark("plan-done");
+    }
     if (state && !strcmp(state, "fail"))
-        touch(MARKER("plan-failed"));
+        mark("plan-failed");
 }
 
 static int valid_plan_id(const char *id)
@@ -1244,13 +1270,15 @@ static void serve_forever(void)
     signal(SIGINT, on_signal);
 
     touch(DAEMON_READY);
-    touch(MARKER("daemon-ready"));
+    mark("daemon-ready");
     step_log("daemon ready, serving on the control channel");
 
     char line[DFCTL_LINE_MAX];
     size_t used = 0;
 
     while (!g_stop) {
+        if (stop_if_enforcing())
+            break;
         if (access(PLAN_FILE, F_OK) == 0)
             run_plan();
         if (g_stop)
@@ -1309,11 +1337,11 @@ int main(void)
     /* Open the control channel first: if this fails there is no point doing
      * anything else, because nothing could be reported. */
     if (setup_transport() != 0) {
-        touch(MARKER("err-transport"));
+        mark("err-transport");
         step_log("FAILED setup_transport: %s", g_owner_note);
         return 1;
     }
-    touch(MARKER("reached-transport"));
+    mark("reached-transport");
     step_log("transport ready: %s", g_owner_note);
 
     /* Record the pid so the app can tell a live daemon from a stale socket. */
@@ -1326,9 +1354,9 @@ int main(void)
      * backend must not prevent environment adoption or daemon readiness. */
     g.step = DFCTL_STEP_PREFS;
     int prefs_rc = read_prefs();
-    touch(MARKER("reached-prefs"));
+    mark("reached-prefs");
     if (prefs_rc != 0) {
-        touch(MARKER("warn-prefs"));
+        mark("warn-prefs");
         step_log("prefs not usable (non-fatal): %s", g.fail_why);
     } else {
         step_log("prefs ok: manager=%s backend=%s stage=%s", g.su_manager, g.su_backend, g_stage);
@@ -1336,8 +1364,8 @@ int main(void)
 
     g.step = DFCTL_STEP_ZYGOTE;
     g.zygote_ok = (adopt_zygote_env() == 0);
-    if (!g.zygote_ok) touch(MARKER("warn-zygote-env"));
-    touch(MARKER("reached-zygote-env"));
+    if (!g.zygote_ok) mark("warn-zygote-env");
+    mark("reached-zygote-env");
     step_log("zygote env: %s", g.zygote_ok ? "adopted" : "FAILED (non-fatal)");
 
     /* Partition protection and module disabling are explicit optional actions,
@@ -1371,10 +1399,10 @@ int main(void)
     /* Mark ready before the handed-off plan so the exploit waiter can return
      * without sitting on the FIFO. Remaining steps run from PLAN_FILE. */
     touch(DAEMON_READY);
-    touch(MARKER("daemon-ready"));
+    mark("daemon-ready");
     step_log("daemon ready; running staged module plan if present");
     run_plan();
-    if (!g_stop)
+    if (!g_stop && !stop_if_enforcing())
         serve_forever();
     return 0;
 }

@@ -53,12 +53,15 @@ fun ScriptsScreen(
     val scrollBehavior = MiuixScrollBehavior()
     val backdrop = rememberPageBackdrop()
     var showProviders by remember { mutableStateOf(false) }
+    var warnRerun by remember { mutableStateOf(false) }
     val overviewScroll = rememberLazyListState()
     var editingId by remember { mutableStateOf<String?>(null) }
     var sheetVisible by remember { mutableStateOf(false) }
     val drafts = remember { mutableStateMapOf<String, ModuleStep>() }
     val dirtyIds = drafts.keys.filterTo(mutableSetOf()) { id -> drafts[id] != plan.steps.firstOrNull { it.id == id } }
     var output by remember { mutableStateOf<String?>(null) }
+    var lastLog by remember { mutableStateOf<String?>(null) }
+    var viewingLast by remember { mutableStateOf(false) }
     val labels = stringArrayResource(R.array.ui_modules_kinds).toList()
     val descriptions = stringArrayResource(R.array.ui_modules_descriptions).toList()
     val errorLabel = stringResource(R.string.ui_modules_error)
@@ -72,6 +75,21 @@ fun ScriptsScreen(
     fun report(failure: Exception) {
         if (failure is CancellationException) throw failure
         output = "$errorLabel: ${failure.message ?: failure.javaClass.simpleName}"
+    }
+    fun runSavedPlan() {
+        launching = true
+        scope.launch {
+            try {
+                withContext(Dispatchers.IO) { ModuleStore.save(context, plan) }
+                val result = ModuleEngine.run(context.applicationContext)
+                if (ModuleEngine.state.value.issues.isEmpty())
+                    output = "$exitLabel: ${result.exit}\n${result.output}"
+            } catch (failure: Exception) { report(failure) }
+            finally {
+                try { reload() } catch (failure: Exception) { report(failure) }
+                launching = false
+            }
+        }
     }
     fun persist(next: ModulePlan, openId: String? = null) {
         if (!idle) return
@@ -99,6 +117,7 @@ fun ScriptsScreen(
             finally { saving = false }
         }
     }
+    LaunchedEffect(execution.running) { if (execution.running) viewingLast = false }
     LaunchedEffect(active, execution.running) {
         loaded = false
         if (!active) return@LaunchedEffect
@@ -170,47 +189,55 @@ fun ScriptsScreen(
                 Card {
                     if (dirtyIds.isNotEmpty()) Text(stringResource(R.string.ui_modules_unsaved), modifier = Modifier.padding(16.dp))
                     TextButton(text = stringResource(R.string.ui_modules_run), enabled = idle && dirtyIds.isEmpty() && plan.steps.any { it.enabled }, colors = ButtonDefaults.textButtonColorsPrimary(), modifier = Modifier.fillMaxWidth().padding(8.dp), onClick = {
-                        launching = true
-                        scope.launch {
-                            try {
-                                withContext(Dispatchers.IO) { ModuleStore.save(context, plan) }
-                                // Runs the precondition check first; a failure opens
-                                // the requirements dialog instead of executing.
-                                val result = ModuleEngine.run(context.applicationContext)
-                                if (ModuleEngine.state.value.issues.isEmpty())
-                                    output = "$exitLabel: ${result.exit}\n${result.output}"
-                            } catch (failure: Exception) { report(failure) }
-                            finally {
-                                try { reload() } catch (failure: Exception) { report(failure) }
-                                launching = false
-                            }
-                        }
+                        if (BootMarkers.thisBoot(context)) warnRerun = true
+                        else runSavedPlan()
                     })
                 }
             }
             item {
-                SmallTitle(stringResource(R.string.ui_modules_output))
+                val logKind = when {
+                    execution.running -> R.string.ui_modules_log_running
+                    viewingLast -> R.string.ui_modules_log_last
+                    execution.output.isNotBlank() || output != null -> R.string.ui_modules_log_this
+                    else -> R.string.ui_modules_output
+                }
+                val body = when {
+                    execution.running -> execution.output
+                    viewingLast -> lastLog.orEmpty()
+                    output != null -> output.orEmpty()
+                    execution.output.isNotBlank() -> execution.output
+                    else -> ""
+                }
+                SmallTitle(stringResource(logKind))
                 Card {
                     SelectionContainer {
-                        Text(if (execution.running) execution.output else output ?: execution.output.takeIf { it.isNotBlank() } ?: stringResource(R.string.ui_modules_no_output),
+                        Text(body.ifBlank { stringResource(R.string.ui_modules_no_output) },
                             fontFamily = FontFamily.Monospace, style = MiuixTheme.textStyles.footnote1,
                             modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp, max = 280.dp).verticalScroll(rememberScrollState()).padding(16.dp))
                     }
-                    // The run log path is shown rather than hidden behind a
-                    // button: finding it after a failure is the whole point.
-                    val logPath = execution.logPath.ifBlank { remember { ModuleEngine.logFile(context).absolutePath } }
+                    val latestPath = ModuleEngine.logFile(context).absolutePath
+                    val logPath = if (execution.running && execution.logPath.isNotBlank()) execution.logPath else latestPath
                     Text(logPath, fontFamily = FontFamily.Monospace, style = MiuixTheme.textStyles.footnote2,
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary, modifier = Modifier.padding(horizontal = 16.dp))
                     TextButton(text = stringResource(R.string.ui_modules_log), enabled = !execution.running, modifier = Modifier.fillMaxWidth().padding(8.dp), onClick = {
                         scope.launch {
-                            try { output = withContext(Dispatchers.IO) { ModuleEngine.logFile(context).takeIf { it.isFile }?.readText()?.takeLast(32768) } }
-                            catch (failure: Exception) { report(failure) }
+                            try {
+                                val text = withContext(Dispatchers.IO) {
+                                    ModuleEngine.logFile(context).takeIf { it.isFile }?.readText()?.takeLast(32768)
+                                }
+                                lastLog = text ?: context.getString(R.string.ui_modules_log_missing)
+                                viewingLast = true
+                            } catch (failure: Exception) { report(failure) }
                         }
                     })
                 }
             }
         }
     }
+    RerunWarningDialog(show = warnRerun, onDismiss = { warnRerun = false }, onConfirm = {
+        warnRerun = false
+        runSavedPlan()
+    })
     OverlayBottomSheet(show = active && showProviders,
         title = stringResource(R.string.ui_modules_choose),
         onDismissRequest = { showProviders = false }) {
@@ -268,8 +295,7 @@ private fun ModuleEditor(step: ModuleStep, managers: List<ManagerApp>, drafts: a
     val errorLabel = stringResource(R.string.ui_modules_error)
     val invalidLabel = stringResource(R.string.ui_modules_invalid)
     val dirty = draft != step
-    val invalid = draft.script.toByteArray(Charsets.UTF_8).size > 32768 || '\u0000' in draft.script || '\u0000' in draft.name ||
-        '\u0000' in draft.kmi || '\n' in draft.kmi || '\r' in draft.kmi
+    val invalid = draft.script.toByteArray(Charsets.UTF_8).size > 32768 || '\u0000' in draft.script || '\u0000' in draft.name
 
     val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null && enabled && currentVisible) {

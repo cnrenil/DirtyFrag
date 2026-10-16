@@ -56,12 +56,12 @@ class ModulePolicyTest {
         assertEquals("No enabled modules", disarmed.lastFailure)
     }
     @Test fun rebootProviderKeepsAutomaticExecutionArmed() {
-        val reboot = ModuleStep(kind = ModuleKind.SOFT_REBOOT)
-        val completed = ModulePolicy.completed(plan.copy(steps = plan.steps + reboot))
+        val reboot = second.copy(softReboot = true)
+        val completed = ModulePolicy.completed(plan.copy(steps = listOf(first, reboot)))
         assertTrue(completed.onAppOpen)
         assertTrue(completed.onBoot)
         assertEquals("", completed.lastFailure)
-        assertTrue(ModulePolicy.completed(plan.copy(steps = plan.steps + reboot.copy(enabled = false))).onBoot)
+        assertTrue(ModulePolicy.completed(plan.copy(steps = listOf(first, reboot.copy(enabled = false)))).onBoot)
     }
     @Test(expected = IllegalArgumentException::class) fun rejectDuplicateSteps() {
         ModuleStore.validate(plan.copy(steps = listOf(first, first)))
@@ -74,12 +74,11 @@ class ModulePolicyTest {
         // mutable tree cannot: an env with root but no manager must refuse a
         // soft reboot, and the daemon step must satisfy root for later steps.
         val env = RequirementEnvironment(rootAvailable = true, nativeAvailable = true, managers = emptySet())
-        val issues = ModulePreflight.inspect(ModulePlan(steps = listOf(ModuleStep(kind = ModuleKind.SOFT_REBOOT))), env)
-        assertEquals(listOf(RequirementReason.REBOOT_MANAGER_REQUIRED), issues.map { it.reason })
+        val issues = ModulePreflight.inspect(ModulePlan(steps = listOf(ModuleStep(kind = ModuleKind.MANAGER, managerPackage = "test.manager", softReboot = true))), env)
+        assertTrue(issues.any { it.reason == RequirementReason.DAEMON_REQUIRED })
         assertTrue(ModulePreflight.inspect(ModulePlan(steps = listOf(ModuleStep(kind = ModuleKind.SHELL, script = "id"))), env).isEmpty())
-        assertEquals(listOf(ModuleKind.DAEMON, ModuleKind.SHELL, ModuleKind.SHELL, ModuleKind.MANAGER), ModuleDefaults.legacy().map { it.kind })
+        assertEquals(listOf(ModuleKind.DAEMON, ModuleKind.SHELL, ModuleKind.MANAGER), ModuleDefaults.legacy().map { it.kind })
         assertEquals(ScriptPresets.PARTITIONS_RO, ModuleDefaults.legacy()[1].script)
-        assertEquals(ScriptPresets.UNLOAD_MODULE, ModuleDefaults.legacy()[2].script)
         assertNotEquals(ModuleDefaults.legacy().first().id, ModuleDefaults.legacy().first().id)
     }
     @Test fun daemonStepSatisfiesRootForLaterSteps() {
@@ -102,22 +101,14 @@ class ModulePolicyTest {
         val noLibrary = installed.copy(backendLibraryPresent = false)
         assertEquals(listOf(RequirementReason.MANAGER_LIBRARY_MISSING), ModulePreflight.inspect(ok, noLibrary).map { it.reason })
     }
-    @Test fun softRebootAcceptsTheInstalledDataAdbBinary() {
-        val env = RequirementEnvironment(rootAvailable = true, nativeAvailable = true,
-            managers = setOf("me.weishu.kernelsu"), rebootBinaries = setOf("ksud"),
-            managerBackends = mapOf("me.weishu.kernelsu" to "ksud"))
-        val plan = ModulePlan(steps = listOf(
-            ModuleStep(kind = ModuleKind.MANAGER, managerPackage = "me.weishu.kernelsu"),
-            ModuleStep(kind = ModuleKind.SOFT_REBOOT)))
-        assertTrue(ModulePreflight.inspect(plan, env).isEmpty())
-    }
     @Test fun emptyPlanIsReportedBeforeItIsExecuted() {
         val env = RequirementEnvironment(rootAvailable = true, nativeAvailable = true, managers = emptySet())
         assertEquals(listOf(RequirementReason.EMPTY_PLAN),
             ModulePreflight.inspect(ModulePlan(), env).map { it.reason })
     }
-    @Test fun softRebootTargetsDataAdbNotAStagedCopy() {
-        assertEquals("/data/adb/ksud", ModuleEngine.softRebootPath("ksud"))
-        assertEquals("/data/adb/apd", ModuleEngine.softRebootPath("apd"))
+    @Test fun decodeDropsStandaloneSoftRebootKind() {
+        assertNull(ModuleStore.parseKind("SOFT_REBOOT"))
+        assertNull(ModuleStore.parseKind("not-a-kind"))
+        assertEquals(ModuleKind.MANAGER, ModuleStore.parseKind("MANAGER"))
     }
 }

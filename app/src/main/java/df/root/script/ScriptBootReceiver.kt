@@ -7,18 +7,34 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 
-/** Boot is only an entry point for an explicitly enabled module plan. */
+/**
+ * Boot entry for an explicitly enabled module plan.
+ *
+ * `LOCKED_BOOT_COMPLETED` fires before the PIN, while credential-encrypted
+ * storage is still unavailable. Everything the plan needs already lives in
+ * device-protected storage (`/data/user_de/0/df.root`). `BOOT_COMPLETED` is
+ * kept as a fallback on firmwares that skip locked-boot broadcasts; the engine
+ * no-ops if this boot already finished.
+ */
 class ScriptBootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
-        val app = context.applicationContext
+        if (intent.action != Intent.ACTION_LOCKED_BOOT_COMPLETED &&
+            intent.action != Intent.ACTION_BOOT_COMPLETED) return
+        val app = context.applicationContext.createDeviceProtectedStorageContext()
         try {
             if (!ModuleStore.read(app).onBoot) return
+            if (BootMarkers.autoConsumed(app)) return
             val scheduler = app.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
-            scheduler.schedule(JobInfo.Builder(7342, ComponentName(app, ScriptBootJob::class.java))
-                .setMinimumLatency(0).build())
+            scheduler.schedule(JobInfo.Builder(JOB_ID, ComponentName(app, ScriptBootJob::class.java))
+                .setMinimumLatency(0)
+                .setOverrideDeadline(5_000)
+                .build())
         } catch (failure: Exception) {
             android.util.Log.e("dfroot", "Unable to schedule module plan", failure)
         }
+    }
+
+    companion object {
+        const val JOB_ID = 7342
     }
 }

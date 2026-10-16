@@ -10,7 +10,7 @@ object ScriptStore {
 }
 
 object ScriptPresets {
-    val ids = listOf("diagnostics", "clean_markers", "unload_module", "cleanup")
+    val ids = listOf("diagnostics", "unload_module")
 
     /** Markers now live in the app's data directory, so cleanup targets it. */
     fun cleanMarkers(context: Context) = cleanMarkers(RuntimeFiles.markers(context).absolutePath)
@@ -68,20 +68,11 @@ object ScriptPresets {
         val backend = selected?.backend?.takeIf { it.isNotBlank() }
             ?: managerPackage?.let { ManagerCatalog.backendFor(context, it) }
             ?: "ksud"
-        val kmi = selected?.kmi ?: context.createDeviceProtectedStorageContext()
+        val kmi = context.createDeviceProtectedStorageContext()
             .getSharedPreferences("dfroot", Context.MODE_PRIVATE).getString("kmi", null)
         return when (id) {
             "diagnostics" -> diagnostics(context)
-            "clean_markers" -> cleanMarkers(context)
             "unload_module" -> UNLOAD_MODULE
-            "cleanup" -> buildString {
-                append(UNLOAD_MODULE).append('\n')
-                append("unload_rc=\$?\n")
-                append(cleanMarkers(context)).append('\n')
-                append("clean_rc=\$?\n")
-                append("printf 'rmmod=%s cleanup=%s\\n' \"\$unload_rc\" \"\$clean_rc\"\n")
-                append("[ \"\$unload_rc\" -eq 0 ] && [ \"\$clean_rc\" -eq 0 ]")
-            }
             "late_load" -> managerPackage?.let { lateLoad(context, backend, it, kmi) }
                 ?: error("Select an SU manager first")
             else -> error("Unknown preset: $id")

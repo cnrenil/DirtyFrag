@@ -16,6 +16,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include "aes256.h"
+#include "dfctl.h"
 
 static const char kCrashDump[] = "/apex/com.android.runtime/bin/crash_dump64";
 static char    *libcxx_ko_target;
@@ -783,7 +784,7 @@ static int exploit(void) {
             if (seen[j]) continue;
             char path[256];
             snprintf(path, sizeof(path), "%s%s", MARKERS, markers[j].name);
-            if (access(path, F_OK) != 0) continue;
+            if (!dfctl_marker_this_boot(path)) continue;
             seen[j] = 1;
             printf("%s\n", markers[j].msg);
             /* rc 0 ends the run while leaving the daemon alive; the app

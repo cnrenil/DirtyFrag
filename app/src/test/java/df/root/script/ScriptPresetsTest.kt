@@ -24,7 +24,8 @@ class ScriptPresetsTest {
         // late-load is driven by the manager step now; the shortcut list must not
         // still offer a preset that copied libksud.so into the data dir.
         assertFalse(ScriptPresets.ids.contains("late_load"))
-        assertTrue(ScriptPresets.ids.contains("clean_markers"))
+        assertFalse(ScriptPresets.ids.contains("clean_markers"))
+        assertTrue(ScriptPresets.ids.contains("unload_module"))
     }
     @Test fun automaticExecutionIsOptIn() {
         assertFalse(ScriptConfig().enabled)

@@ -29,6 +29,11 @@
 #ifndef DFCTL_H
 #define DFCTL_H
 
+#include <fcntl.h>
+#include <stddef.h>
+#include <string.h>
+#include <unistd.h>
+
 #define DAEMON_DIR      "/data/user_de/0/df.root/daemon-control"
 #define DAEMON_FIFO_IN  DAEMON_DIR "/dfctl.in"   /* app  -> daemon */
 #define DAEMON_FIFO_OUT DAEMON_DIR "/dfctl.out"  /* daemon -> app */
@@ -50,6 +55,61 @@
  * a marker cannot be confused with a device node. */
 #define MARKER_DIR      "/data/user_de/0/df.root/markers"
 #define MARKER(s)       MARKER_DIR "/" s
+#define BOOT_ID_PROC    "/proc/sys/kernel/random/boot_id"
+
+/* Marker files store the kernel boot id as their contents. A leftover file
+ * from a previous boot is ignored because the stored id no longer matches
+ * BOOT_ID_PROC — no directory wipe is required. */
+static inline int dfctl_read_trimmed(const char *path, char *buf, size_t n)
+{
+    int fd;
+    ssize_t r;
+    if (!path || !buf || n == 0) return -1;
+    fd = open(path, O_RDONLY | O_CLOEXEC);
+    if (fd < 0) return -1;
+    r = read(fd, buf, n - 1);
+    close(fd);
+    if (r < 0) return -1;
+    buf[r] = '\0';
+    while (r > 0) {
+        char c = buf[r - 1];
+        if (c != '\n' && c != '\r' && c != ' ' && c != '\t') break;
+        buf[--r] = '\0';
+    }
+    return 0;
+}
+
+static inline int dfctl_live_boot_id(char *buf, size_t n)
+{
+    return dfctl_read_trimmed(BOOT_ID_PROC, buf, n);
+}
+
+/* Marker files start with the boot id; extra lines are payload. */
+static inline int dfctl_first_line(const char *text, char *out, size_t n)
+{
+    size_t i = 0;
+    if (!text || !out || n == 0) return -1;
+    while (text[i] && text[i] != '\n' && text[i] != '\r' && i + 1 < n) {
+        out[i] = text[i];
+        i++;
+    }
+    out[i] = '\0';
+    while (i > 0) {
+        char c = out[i - 1];
+        if (c != ' ' && c != '\t') break;
+        out[--i] = '\0';
+    }
+    return 0;
+}
+
+static inline int dfctl_marker_this_boot(const char *path)
+{
+    char live[80], stored[256], first[80];
+    if (dfctl_live_boot_id(live, sizeof live) != 0 || !live[0]) return 0;
+    if (dfctl_read_trimmed(path, stored, sizeof stored) != 0 || !stored[0]) return 0;
+    if (dfctl_first_line(stored, first, sizeof first) != 0 || !first[0]) return 0;
+    return strcmp(live, first) == 0;
+}
 
 /* The daemon's own step trace, appended to as each stage completes. Separate
  * from DAEMON_LOG (which is the startup banner) so triage can see ordering. */

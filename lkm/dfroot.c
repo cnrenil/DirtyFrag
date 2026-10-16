@@ -67,16 +67,18 @@ static int __nocfi __init dfroot_init(void)
      * is what 4.0/4.1 used and is cheap when they are absent. */
     static const char sh[] = "/system/bin/sh";
     static const char daemon[] = "/data/user_de/0/df.root/daemon";
-    static char cmd[768];
+    static char cmd[896];
     static char *envp[] = { "PATH=/system/bin", NULL };
     static char *argv[] = { (char *)sh, "-c", cmd, NULL };
 
     snprintf(cmd, sizeof(cmd),
         "d=/data/user_de/0/df.root/markers;"
         " mkdir -p $d 2>/dev/null;"
-        " touch $d/kernel-module 2>/dev/null;"
+        " id=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null);"
+        " printf '%%s\\nkernel-module' \"$id\" > $d/kernel-module 2>/dev/null;"
+        " printf '%%s' \"$id\" > $d/boot_id 2>/dev/null;"
         " o=$(stat -c '%%u:%%g' /data/user_de/0/df.root 2>/dev/null);"
-        " [ -n \"$o\" ] && chown $o $d/kernel-module 2>/dev/null;"
+        " [ -n \"$o\" ] && chown $o $d $d/boot_id $d/kernel-module 2>/dev/null;"
         " rmmod oplus_secure_harden 2>/dev/null;"
         " rmmod oplus_security_keventupload 2>/dev/null;"
         " rmmod oplus_security_guard 2>/dev/null;"

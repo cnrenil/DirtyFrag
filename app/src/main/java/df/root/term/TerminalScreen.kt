@@ -189,8 +189,7 @@ private fun TerminalContent(
                 val labels = listOf(
                     stringResource(R.string.terminal_choose_shortcut), "daemon", "env", "id", "markers",
                     stringResource(R.string.terminal_modules), stringResource(R.string.terminal_logs), "dmesg", "selinux",
-                    stringResource(R.string.shortcut_clean_markers), stringResource(R.string.shortcut_unload_module),
-                    stringResource(R.string.shortcut_cleanup),
+                    stringResource(R.string.shortcut_unload_module),
                 )
                 val commands = listOf("", "!status", "!env", "id", "ls -la /data/user_de/0/df.root/markers/",
                     "cat /proc/modules | grep dfroot", "!__log", "dmesg | grep -i dfroot | tail -40", "getenforce")
@@ -205,8 +204,7 @@ private fun TerminalContent(
                             commands.getOrNull(index)?.takeIf { it.isNotEmpty() }?.let(model::updateInput)
                         } else {
                             try {
-                                val id = listOf("clean_markers", "unload_module", "cleanup")[index - commands.size]
-                                model.updateInput(df.root.script.ScriptPresets.command(context, id).replace("\n", "; "))
+                                model.updateInput(df.root.script.ScriptPresets.command(context, "unload_module").replace("\n", "; "))
                             } catch (failure: Exception) {
                                 android.widget.Toast.makeText(context, pickManagerLabel, android.widget.Toast.LENGTH_SHORT).show()
                             }

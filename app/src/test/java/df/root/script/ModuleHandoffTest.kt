@@ -12,16 +12,14 @@ class ModuleHandoffTest {
         assertEquals("echo hi", ScriptPresets.moduleScript(ModuleKind.SHELL, "echo hi", "/m"))
         val partitions = ModuleDefaults.step(ModuleKind.PARTITIONS_RO)
         val disable = ModuleDefaults.step(ModuleKind.DISABLE_KSU_MODULES)
-        val clean = ModuleDefaults.step(ModuleKind.CLEAN_MARKERS)
         val unload = ModuleDefaults.step(ModuleKind.UNLOAD_MODULE)
         assertEquals(ModuleKind.SHELL, partitions.kind)
         assertEquals(ScriptPresets.PARTITIONS_RO, partitions.script)
         assertEquals(ModuleKind.SHELL, disable.kind)
         assertEquals(ScriptPresets.DISABLE_KSU_MODULES, disable.script)
-        assertEquals(ModuleKind.SHELL, clean.kind)
-        assertEquals(ScriptPresets.CLEAN_MARKERS, clean.script)
         assertEquals(ModuleKind.SHELL, unload.kind)
         assertEquals(ScriptPresets.UNLOAD_MODULE, unload.script)
+        assertFalse(ModuleDefaults.providers.contains(ModuleKind.CLEAN_MARKERS))
     }
 
     @Test fun planRoundTripsExecLateLoadAndSoftReboot() {

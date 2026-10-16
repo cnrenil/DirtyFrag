@@ -78,6 +78,8 @@ object ModuleEngine {
                 if (trigger == "app" && !saved.onAppOpen || trigger == "boot" && !saved.onBoot)
                     return@withContext ShellResult(0, "Automatic execution disabled")
                 original = saved
+                if (trigger != "manual" && BootMarkers.autoConsumed(context))
+                    return@withContext ShellResult(0, "Already completed this boot")
                 val token = UUID.randomUUID().toString()
                 ModuleStore.activeToken = token
                 ModuleStore.persist(context, ModulePolicy.begin(saved, token))
@@ -95,6 +97,7 @@ object ModuleEngine {
             }
             RunLog.append(context, log, RunLog.header(context, trigger, startedAt, Shell.detect(context)))
             publish("trigger=$trigger log=${log.absolutePath}\n")
+            BootMarkers.write(context, BootMarkers.BOOT_RUN, trigger)
 
             val snapshot = checkNotNull(original)
             val total = snapshot.steps.count { it.enabled }.coerceAtLeast(1)
@@ -113,7 +116,10 @@ object ModuleEngine {
             val prefix = if (daemonAt >= 0) enabled.take(daemonAt) else emptyList()
             val rest = if (daemonAt >= 0) enabled.drop(daemonAt + 1) else enabled
             val startDaemon = daemonAt >= 0
-            val daemonSoon = startDaemon || daemonProcessAlive(context)
+            val aliveBefore = daemonProcessAlive(context)
+            val thisBootReady = BootMarkers.has(context, BootMarkers.DAEMON_READY)
+            val skipExploit = !startDaemon || aliveBefore
+            val handoff = rest.isNotEmpty() && (aliveBefore || !skipExploit)
 
             val outcome = run {
                 ModuleSequence.execute(prefix) { step ->
@@ -125,15 +131,16 @@ object ModuleEngine {
                     advance()
                     result
                 }
-                if (startDaemon || (daemonSoon && rest.isNotEmpty())) {
+                if (startDaemon || handoff || (thisBootReady && rest.isNotEmpty())) {
                     ModuleHandoff.clear(context)
-                    if (rest.isNotEmpty()) {
+                    if (handoff) {
                         ModuleHandoff.write(context, rest)
                         publish("handoff ${rest.size} step(s) to daemon via ${ModuleHandoff.planFile(context).absolutePath}\n")
                     }
                     val boot = if (!startDaemon) ShellResult(0, "") else {
                         note(enabled[daemonAt])
-                        val result = bootstrapDaemon(context, ::publish)
+                        val result = if (skipExploit) ShellResult(0, "Daemon already ready")
+                        else bootstrapDaemon(context, ::publish)
                         publish(result.output.trimEnd() + "\nexit=${result.exit}\n")
                         if (result.ok) advance()
                         result
@@ -142,7 +149,18 @@ object ModuleEngine {
                         ModuleHandoff.clear(context)
                         boot
                     } else if (rest.isEmpty()) ShellResult(0, "")
-                    else awaitPlan(context, rest.associateBy { it.id }, ::publish, ::note, ::advance)
+                    else if (handoff) awaitPlan(context, rest.associateBy { it.id }, ::publish, ::note, ::advance)
+                    else ModuleSequence.execute(rest) { step ->
+                        ensureActive()
+                        note(step)
+                        val result = if (step.kind == ModuleKind.MANAGER) {
+                            ShellResult(0, "skip: daemon already started this boot and is no longer running")
+                        } else executeLocal(context, step)
+                        publish(result.output.trimEnd() + "\nexit=${result.exit}\n")
+                        if (!result.ok) publish("continuing after non-zero exit\n")
+                        advance()
+                        result
+                    }
                 } else ModuleSequence.execute(rest) { step ->
                     ensureActive()
                     note(step)
@@ -185,7 +203,7 @@ object ModuleEngine {
     private suspend fun bootstrapDaemon(context: Context, report: (String) -> Unit): ShellResult {
         if (daemonProcessAlive(context)) return ShellResult(0, "Daemon already ready")
         val rc = ExploitRunner.run(context.applicationContext, IReporter { report(it) })
-        val ready = File(Dfctl.dir(context), "dfctl.ready").isFile
+        val ready = BootMarkers.has(context, BootMarkers.DAEMON_READY)
         val status = ModuleHandoff.statusFile(context).takeIf { it.isFile }?.let { ModuleHandoff.parseStatus(it.readText()) }
         return if (ModuleHandoff.bootstrapSucceeded(rc, daemonProcessAlive(context), ready, status))
             ShellResult(0, "Daemon ready")
@@ -206,8 +224,6 @@ object ModuleEngine {
         val finished = mutableSetOf<String>()
         val statusFile = ModuleHandoff.statusFile(context)
         val logFile = ModuleHandoff.logFile(context)
-        val done = File(RuntimeFiles.markers(context), ModuleHandoff.MARKER_DONE)
-        val failed = File(RuntimeFiles.markers(context), ModuleHandoff.MARKER_FAILED)
         while (System.currentTimeMillis() < deadline) {
             currentCoroutineContext().ensureActive()
             val logText = logFile.takeIf { it.isFile }?.readText().orEmpty()
@@ -232,12 +248,12 @@ object ModuleEngine {
                     creditRemaining(byId.keys, finished, advance)
                     return ShellResult(0, status.line)
                 }
-                status?.state == "done" || done.isFile -> {
+                status?.state == "done" -> {
                     creditRemaining(byId.keys, finished, advance)
                     return ShellResult(0, "plan done")
                 }
-                status?.state == "fail" || failed.isFile ->
-                    return ShellResult(status?.exit?.takeIf { it != 0 } ?: 1, status?.line ?: "plan failed")
+                status?.state == "fail" ->
+                    return ShellResult(status.exit.takeIf { it != 0 } ?: 1, status.line.ifBlank { "plan failed" })
             }
             delay(150)
         }
@@ -249,10 +265,12 @@ object ModuleEngine {
         ids.forEach { id -> if (id.isNotEmpty() && finished.add(id)) advance() }
     }
 
-    /** Pid file plus /proc: never a FIFO round trip. */
+    /** Pid file plus live cmdline: a leftover pid after reboot is not this daemon. */
     internal fun daemonProcessAlive(context: Context): Boolean {
         val pid = Dfctl.pid(context) ?: return false
-        return File("/proc/$pid").isDirectory
+        if (!File("/proc/$pid").isDirectory) return false
+        val cmd = runCatching { File("/proc/$pid/cmdline").readBytes().toString(Charsets.ISO_8859_1) }.getOrDefault("")
+        return cmd.contains("/data/user_de/0/df.root/daemon")
     }
 
     private suspend fun executeLocal(context: Context, step: ModuleStep): ShellResult {
@@ -267,24 +285,6 @@ object ModuleEngine {
         RuntimeFiles.adopt(context, file)
         return Shell.run(context, "/system/bin/sh " + ScriptPresets.quote(file.absolutePath))
     }
-
-    /**
-     * The binary a soft reboot should use.
-     *
-     * Never the staged copy in the data dir: after a reboot that path is
-     * re-created by us, and a soft reboot is exactly the moment the running
-     * daemon's own files may already be gone. /data/adb/ksud and /data/adb/apd
-     * are the manager's installed binaries and survive everything.
-     */
-    internal fun softRebootBinary(context: Context, step: ModuleStep): String {
-        val prefs = context.createDeviceProtectedStorageContext().getSharedPreferences("dfroot", Context.MODE_PRIVATE)
-        val manager = prefs.getString("su_manager", null)
-        require(!manager.isNullOrBlank()) { "Load a manager before requesting soft reboot" }
-        return softRebootPath(prefs.getString("su_backend", "ksud") ?: "ksud")
-    }
-
-    /** Pure mapping from backend to the installed binary, for tests. */
-    internal fun softRebootPath(backend: String): String = if (backend == "apd") "/data/adb/apd" else "/data/adb/ksud"
 
     internal fun command(context: Context, step: ModuleStep): String =
         ScriptPresets.moduleScript(step.kind, step.script, RuntimeFiles.markers(context).absolutePath)

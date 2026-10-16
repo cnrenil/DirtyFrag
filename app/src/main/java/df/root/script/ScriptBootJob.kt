@@ -8,8 +8,9 @@ class ScriptBootJob : JobService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var job: Job? = null
     override fun onStartJob(params: JobParameters): Boolean {
+        val app = applicationContext.createDeviceProtectedStorageContext()
         job = scope.launch {
-            try { ModuleEngine.run(applicationContext, "boot") }
+            try { ModuleEngine.run(app, "boot") }
             finally { jobFinished(params, false) }
         }
         return true

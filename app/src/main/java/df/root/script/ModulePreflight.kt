@@ -76,12 +76,6 @@ object ModulePreflight {
                         if (!daemon) issue(RequirementReason.DAEMON_REQUIRED)
                     }
                 }
-                ModuleKind.SOFT_REBOOT -> {
-                    if (!root) issue(RequirementReason.ROOT_REQUIRED)
-                    if (backend !in setOf("apd", "ksud")) issue(RequirementReason.REBOOT_MANAGER_REQUIRED)
-                    else if (!managerWillLoad && backend !in env.rebootBinaries) issue(RequirementReason.REBOOT_BINARY_MISSING)
-                }
-                ModuleKind.CLEAN_MARKERS -> if (!root) issue(RequirementReason.ROOT_REQUIRED)
                 else -> if (!root) issue(RequirementReason.ROOT_REQUIRED)
             }
         }
@@ -99,13 +93,14 @@ object ModulePreflight {
         ModuleStore.validate(plan)
         val kmiSelection = Kmi.readSelection(context)
         val detectedBranch = Kmi.readInfo().detectedBranch
-        val invalidKmiIds = plan.steps.asSequence().filter { it.enabled && it.kind in setOf(ModuleKind.DAEMON, ModuleKind.MANAGER) }
-            .filter { ModuleKmi.resolve(it.kmi, kmiSelection.branch, detectedBranch) == null }
+        val kmiOk = ModuleKmi.resolve("", kmiSelection.branch, detectedBranch) != null
+        val invalidKmiIds = if (kmiOk) emptySet() else plan.steps.asSequence()
+            .filter { it.enabled && it.kind in setOf(ModuleKind.DAEMON, ModuleKind.MANAGER) }
             .map { it.id }.toSet()
         val managers = runCatching { ManagerCatalog.scan(context) }.getOrDefault(emptyList())
         val privilege = Shell.detect(context)
         val root = privilege != Privilege.App
-        val needsReboot = plan.steps.any { it.enabled && it.kind == ModuleKind.SOFT_REBOOT }
+        val needsReboot = plan.steps.any { it.enabled && it.kind == ModuleKind.MANAGER && it.softReboot }
         val binaries = if (root && needsReboot) {
             val result = Shell.run(context, "for name in ksud apd; do [ -x /data/adb/\"\$name\" ] && echo \"\$name\"; done")
             result.output.lineSequence().map { it.trim() }.filter { it in setOf("apd", "ksud") }.toSet()

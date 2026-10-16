@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.16
+
 ### LKM / bootstrap (selective from upstream DFRoot)
 - Stop stripping `.note.gnu.build-id` from `dfroot.ko` (Makefile and CI). Some loaders need it.
 - Replace live DEFEX kprobes with `aarch64_insn_patch_text` so the functions return 0
@@ -17,8 +19,18 @@
   waits for insmod or execs the daemon.
 - dfdaemon switches `/proc/self/attr/current` to `u:r:init:s0` while SELinux is still permissive
   (KSU only allows init to enter the ksud domain). Late-load children do the same.
-- **Unload dfroot** is `rmmod dfroot 2>/dev/null || true` so the default plan does not fail after
-  the module has already self-unloaded.
+- The default plan is **Start daemon → Protect read-only partitions → SU manager**. Unload dfroot is
+  still an optional shell preset; it is not in the default sequence because the module already
+  self-unloads (`-ENODEV`).
+- Run markers store the kernel boot id (`/proc/sys/kernel/random/boot_id`) as their contents. A
+  leftover `daemon-ready` from last boot is ignored, so the exploit is not re-run on the same boot
+  and the home screen can still show rooted after the daemon exits. There is no "clean markers" step.
+- dfdaemon exits on its own when `/sys/fs/selinux/enforce` becomes `1` (KernelSU late-load). Markers
+  stay; the control channel does not.
+- Boot auto-run is Direct Boot aware: `LOCKED_BOOT_COMPLETED` starts the plan before the PIN, using
+  device-protected storage. `BOOT_COMPLETED` remains a fallback if locked-boot is skipped.
+- Automatic boot/app-open runs at most once per kernel `boot_id`. A `boot-run` marker is written when
+  the plan starts, and ksud soft-reboot (same `boot_id`) will not start it again.
 
 ### Daemon plan handoff
 - Running a module plan no longer waits for the FIFO after **Start daemon**. The app writes the
@@ -27,10 +39,10 @@
 - Every step except daemon bootstrap and SU-manager late-load is a shell script. Partition
   protection, KSU-module disable, marker cleanup, unload and custom SH files are `sh` files the
   daemon execs; late-load stays the native `libksud.so`/`libapd.so` path, with optional soft reboot.
-- **Protect read-only partitions**, **Disable KernelSU modules**, **Clean run markers** and
-  **Unload dfroot** are SHELL presets: adding or resetting them creates an editable shell module
-  with the previous command already filled in. Only daemon bootstrap and SU-manager late-load stay
-  native.
+- **Protect read-only partitions**, **Disable KernelSU modules** and **Unload dfroot** are SHELL
+  presets: adding or resetting them creates an editable shell module with the previous command
+  already filled in. Only daemon bootstrap and SU-manager late-load stay native. KMI comes from
+  Settings, not a per-manager override.
 
 ### Script modules
 - Script modules moved to their own destination in the bottom bar, next to Home and Terminal, instead

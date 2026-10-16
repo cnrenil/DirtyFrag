@@ -12,8 +12,7 @@ internal object ModulePolicy {
     fun completed(plan: ModulePlan) = plan.copy(inFlight = "", lastFailure = "")
     fun recover(plan: ModulePlan, activeToken: String): ModulePlan {
         if (plan.inFlight.isEmpty() || plan.inFlight == activeToken) return plan
-        val rebootAccepted = plan.steps.any { it.enabled &&
-            (it.kind == ModuleKind.SOFT_REBOOT || it.kind == ModuleKind.MANAGER && it.softReboot) }
+        val rebootAccepted = plan.steps.any { it.enabled && it.kind == ModuleKind.MANAGER && it.softReboot }
         return if (rebootAccepted) completed(plan)
         else plan.copy(inFlight = "", lastFailure = "Previous execution was interrupted")
     }

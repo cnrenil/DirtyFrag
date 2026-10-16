@@ -6,8 +6,7 @@ import org.json.JSONObject
 import java.io.File
 import java.util.UUID
 
-// SOFT_REBOOT is deprecated: retained only to decode and migrate old plans.
-enum class ModuleKind { DAEMON, SHELL, MANAGER, DISABLE_KSU_MODULES, PARTITIONS_RO, CLEAN_MARKERS, UNLOAD_MODULE, SOFT_REBOOT }
+enum class ModuleKind { DAEMON, SHELL, MANAGER, DISABLE_KSU_MODULES, PARTITIONS_RO, CLEAN_MARKERS, UNLOAD_MODULE }
 
 /**
  * One entry in the plan.
@@ -21,7 +20,7 @@ enum class ModuleKind { DAEMON, SHELL, MANAGER, DISABLE_KSU_MODULES, PARTITIONS_
 data class ModuleStep(
     val id: String = UUID.randomUUID().toString(), val kind: ModuleKind = ModuleKind.SHELL,
     val enabled: Boolean = true, val name: String = "", val script: String = "",
-    val managerPackage: String = "", val backend: String = "", val kmi: String = "", val softReboot: Boolean = false,
+    val managerPackage: String = "", val backend: String = "", val softReboot: Boolean = false,
 )
 data class ModulePlan(
     val steps: List<ModuleStep> = emptyList(), val onAppOpen: Boolean = false, val onBoot: Boolean = false,
@@ -56,10 +55,6 @@ object ModuleStore {
             persist(context, initial)
         }
         var plan = decode(JSONObject(prefs.getString("plan", "{}")!!))
-        if (activeToken.isEmpty() && plan.steps.any { it.kind == ModuleKind.SOFT_REBOOT }) {
-            persist(context, ModuleMigration.reboots(plan))
-            plan = decode(JSONObject(prefs.getString("plan", "{}")!!))
-        }
         if (plan.inFlight.isNotEmpty() && plan.inFlight != activeToken) {
             val recovered = ModulePolicy.recover(plan, activeToken)
             persist(context, recovered)
@@ -94,8 +89,7 @@ object ModuleStore {
             require(it.id.matches(Regex("[A-Za-z0-9_-]{1,80}")))
             require('\u0000' !in it.script && it.script.toByteArray(Charsets.UTF_8).size <= 32768) { "Script exceeds 32 KiB or contains NUL" }
             require(it.backend in listOf("", "apd", "ksud")) { "Unknown backend: ${it.backend}" }
-            require(it.name.length <= 256 && it.managerPackage.length <= 256 && it.kmi.length <= 256)
-            require(it.kmi.none { ch -> ch == '\u0000' || ch == '\n' || ch == '\r' })
+            require(it.name.length <= 256 && it.managerPackage.length <= 256)
         }
     }
     internal fun encode(plan: ModulePlan) = JSONObject().put("version", 1).put("revision", plan.revision)
@@ -103,28 +97,33 @@ object ModuleStore {
         .put("lastFailure", plan.lastFailure).put("inFlight", plan.inFlight)
         .put("steps", JSONArray().apply { plan.steps.forEach { step -> put(JSONObject()
             .put("id", step.id).put("kind", step.kind.name).put("enabled", step.enabled).put("name", step.name)
-            .put("script", step.script).put("managerPackage", step.managerPackage).put("backend", step.backend).put("kmi", step.kmi).put("softReboot", step.softReboot)) } })
+            .put("script", step.script).put("managerPackage", step.managerPackage).put("backend", step.backend).put("softReboot", step.softReboot)) } })
     internal fun decode(json: JSONObject): ModulePlan {
         require(json.optInt("version", 1) == 1) { "Unsupported module plan version" }
         val array = json.optJSONArray("steps") ?: JSONArray()
-        return ModulePlan(steps = (0 until array.length()).map { i -> array.getJSONObject(i).let {
-            ModuleStep(id = it.getString("id"), kind = ModuleKind.valueOf(it.getString("kind")),
+        return ModulePlan(steps = (0 until array.length()).mapNotNull { i -> array.getJSONObject(i).let {
+            val kind = parseKind(it.getString("kind")) ?: return@mapNotNull null
+            ModuleStep(id = it.getString("id"), kind = kind,
                 enabled = it.optBoolean("enabled", true), name = it.optString("name"), script = it.optString("script"),
-                managerPackage = it.optString("managerPackage"), backend = it.optString("backend").takeIf { b -> b != "auto" } ?: "", kmi = it.optString("kmi"), softReboot = it.optBoolean("softReboot", false))
+                managerPackage = it.optString("managerPackage"), backend = it.optString("backend").takeIf { b -> b != "auto" } ?: "",
+                softReboot = it.optBoolean("softReboot", false))
         } }, onAppOpen = json.optBoolean("onAppOpen"), onBoot = json.optBoolean("onBoot"),
             lastFailure = json.optString("lastFailure"), inFlight = json.optString("inFlight"), revision = json.optLong("revision", 0)).also(::validate)
+    }
+    internal fun parseKind(name: String): ModuleKind? {
+        if (name == "SOFT_REBOOT") return null
+        return runCatching { ModuleKind.valueOf(name) }.getOrNull()
     }
 }
 
 object ModuleDefaults {
     val shellPresetKinds = setOf(
-        ModuleKind.PARTITIONS_RO, ModuleKind.DISABLE_KSU_MODULES, ModuleKind.CLEAN_MARKERS, ModuleKind.UNLOAD_MODULE,
+        ModuleKind.PARTITIONS_RO, ModuleKind.DISABLE_KSU_MODULES, ModuleKind.UNLOAD_MODULE,
     )
 
     fun presetScript(kind: ModuleKind): String? = when (kind) {
         ModuleKind.PARTITIONS_RO -> ScriptPresets.PARTITIONS_RO
         ModuleKind.DISABLE_KSU_MODULES -> ScriptPresets.DISABLE_KSU_MODULES
-        ModuleKind.CLEAN_MARKERS -> ScriptPresets.CLEAN_MARKERS
         ModuleKind.UNLOAD_MODULE -> ScriptPresets.UNLOAD_MODULE
         else -> null
     }
@@ -132,7 +131,6 @@ object ModuleDefaults {
     fun fallbackName(kind: ModuleKind) = when (kind) {
         ModuleKind.PARTITIONS_RO -> "Protect read-only partitions"
         ModuleKind.DISABLE_KSU_MODULES -> "Disable KernelSU modules"
-        ModuleKind.CLEAN_MARKERS -> "Clean run markers"
         ModuleKind.UNLOAD_MODULE -> "Unload dfroot module"
         else -> ""
     }
@@ -144,38 +142,21 @@ object ModuleDefaults {
     }
 
     fun legacy(titles: Map<ModuleKind, String> = emptyMap()) =
-        listOf(ModuleKind.DAEMON, ModuleKind.PARTITIONS_RO, ModuleKind.UNLOAD_MODULE, ModuleKind.MANAGER)
+        listOf(ModuleKind.DAEMON, ModuleKind.PARTITIONS_RO, ModuleKind.MANAGER)
             .map { step(it, titles[it].orEmpty()) }
 
-    val providers = ModuleKind.entries.filter { it != ModuleKind.SOFT_REBOOT }
+    val providers = ModuleKind.entries.filter { it != ModuleKind.CLEAN_MARKERS }
     fun reset(plan: ModulePlan, titles: Map<ModuleKind, String> = emptyMap()): ModulePlan {
         val selected = plan.steps.firstOrNull { it.enabled && it.kind == ModuleKind.MANAGER }
         val steps = legacy(titles).map { step ->
             if (step.kind == ModuleKind.MANAGER && selected != null) step.copy(
-                managerPackage = selected.managerPackage, backend = selected.backend, kmi = selected.kmi) else step
+                managerPackage = selected.managerPackage, backend = selected.backend) else step
         }
         return plan.copy(steps = steps, onAppOpen = false, onBoot = false, lastFailure = "", inFlight = "")
     }
 }
 
-internal object ModuleMigration {
-    fun reboots(plan: ModulePlan): ModulePlan {
-        if (plan.steps.none { it.kind == ModuleKind.SOFT_REBOOT }) return plan
-        val migrated = mutableListOf<ModuleStep>()
-        val warnings = mutableListOf<String>()
-        plan.steps.forEachIndexed { index, step ->
-            if (step.kind != ModuleKind.SOFT_REBOOT) migrated += step
-            else if (step.enabled) {
-                val managerIndex = migrated.indexOfLast { it.kind == ModuleKind.MANAGER }
-                if (managerIndex < 0 || !migrated[managerIndex].enabled)
-                    warnings += "Legacy soft reboot at step ${index + 1} could not be enabled safely: no preceding enabled manager. Review manager settings."
-                else migrated[managerIndex] = migrated[managerIndex].copy(softReboot = true)
-            }
-        }
-        val note = (listOf(plan.lastFailure).filter { it.isNotBlank() } + warnings).joinToString("\n")
-        return plan.copy(steps = migrated, onAppOpen = false, onBoot = false, inFlight = "", lastFailure = note)
-    }
-}
+
 
 data class ManagerApp(val packageName: String, val label: String, val backends: List<String>) {
     /** The backend this manager is bound to. ksud/apd ship in pairs; picking one

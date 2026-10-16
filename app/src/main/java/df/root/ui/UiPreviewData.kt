@@ -9,6 +9,7 @@ import df.root.kmi.KmiInfo
 internal object PreviewCallbacks : MainCallbacks {
     override fun onCancelRunConfirmation() = Unit
     override fun onRunClick() = Unit
+    override fun onConfirmRerun() = Unit
     override fun onSaveLog() = Unit
     override fun onAdvancedLogChange(enabled: Boolean) = Unit
     override fun onOpenGithub() = Unit

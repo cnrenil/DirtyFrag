@@ -22,6 +22,7 @@ data class MainUiState(
 interface MainCallbacks {
     fun onCancelRunConfirmation()
     fun onRunClick()
+    fun onConfirmRerun()
     fun onSaveLog()
     fun onAdvancedLogChange(enabled: Boolean)
     fun onOpenGithub()

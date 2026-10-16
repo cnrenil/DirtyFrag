@@ -17,12 +17,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import df.root.R
+import df.root.script.BootMarkers
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
@@ -32,6 +35,7 @@ import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -43,6 +47,8 @@ fun StatusScreen(
 ) {
     val scroll = MiuixScrollBehavior()
     val backdrop = rememberPageBackdrop()
+    val context = LocalContext.current
+    var warnRerun by remember { mutableStateOf(false) }
     Scaffold(
         modifier = modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -67,16 +73,35 @@ fun StatusScreen(
                     TextButton(
                         text = stringResource(if (state.running) R.string.running else if (state.runArmed) R.string.home_confirm_run else R.string.ui_modules_run_plan),
                         enabled = state.canRun,
-                        onClick = callbacks::onRunClick,
+                        onClick = {
+                            if (BootMarkers.thisBoot(context)) warnRerun = true
+                            else callbacks.onRunClick()
+                        },
                         colors = ButtonDefaults.textButtonColorsPrimary(),
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
             }
             item(key = "log") {
-                SmallTitle(stringResource(R.string.home_log_group))
+                SmallTitle(stringResource(if (state.running) R.string.home_log_running else R.string.home_log_group))
                 LogCard(state, callbacks)
             }
+        }
+    }
+    RerunWarningDialog(show = warnRerun, onDismiss = { warnRerun = false }, onConfirm = {
+        warnRerun = false
+        callbacks.onConfirmRerun()
+    })
+}
+
+@Composable
+internal fun RerunWarningDialog(show: Boolean, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    OverlayDialog(show = show, title = stringResource(R.string.home_rerun_title),
+        summary = stringResource(R.string.home_rerun_warning), onDismissRequest = onDismiss) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            TextButton(text = stringResource(R.string.ui_settings_cancel), modifier = Modifier.weight(1f), onClick = onDismiss)
+            TextButton(text = stringResource(R.string.home_rerun_continue), modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.textButtonColorsPrimary(), onClick = onConfirm)
         }
     }
 }
@@ -85,8 +110,8 @@ fun StatusScreen(
 private fun StatusCard(state: MainUiState) {
     val label = when {
         state.running -> R.string.running
+        state.rooted -> R.string.rooted
         state.failedRun -> R.string.status_failed
-        state.rooted -> R.string.ui_modules_daemon_ready
         state.hasRun -> R.string.status_not_rooted
         else -> R.string.status_idle
     }

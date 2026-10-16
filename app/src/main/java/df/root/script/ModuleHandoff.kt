@@ -113,9 +113,6 @@ internal object ModuleHandoff {
         listOf(PLAN, PLAN_TMP, "plan.running", STATUS, LOG).forEach { name ->
             File(folder, name).takeIf { it.exists() }?.delete()
         }
-        File(RuntimeFiles.markers(context), MARKER_DONE).takeIf { it.exists() }?.delete()
-        File(RuntimeFiles.markers(context), MARKER_FAILED).takeIf { it.exists() }?.delete()
-        File(RuntimeFiles.markers(context), MARKER_ACCEPTED).takeIf { it.exists() }?.delete()
     }
 
     /**
@@ -135,7 +132,7 @@ internal object ModuleHandoff {
                         ?: error("Manager is unavailable: ${step.managerPackage}")
                     val backend = manager.backend
                     val library = ManagerCatalog.libraryPath(context, backend, step.managerPackage)
-                    val kmi = ModuleKmi.resolve(context, step.kmi)
+                    val kmi = ModuleKmi.resolve(context)
                         ?: error("Manager KMI cannot be resolved; select a valid KMI branch in Settings")
                     ExploitRunner.selectManager(context, step.managerPackage, backend)
                     check(context.createDeviceProtectedStorageContext().getSharedPreferences("dfroot", Context.MODE_PRIVATE)
@@ -146,7 +143,6 @@ internal object ModuleHandoff {
                     RuntimeFiles.adopt(context, sidecar)
                     HandoffAction("lateload", step.id, softReboot = step.softReboot)
                 }
-                ModuleKind.SOFT_REBOOT -> HandoffAction("soft-reboot", step.id)
                 else -> {
                     val text = ScriptPresets.moduleScript(step.kind, step.script, markers)
                     require(text.isNotBlank()) { "Shell module is empty" }

@@ -21,17 +21,20 @@
     <string name="ui_modules_run">执行已保存的模块流程</string>
     <string name="ui_modules_output">输出与日志</string>
     <string name="ui_modules_no_output">暂无模块输出</string>
-    <string name="ui_modules_log">查看最近日志</string>
+    <string name="ui_modules_log">查看上次日志</string>
+    <string name="ui_modules_log_running">正在运行</string>
+    <string name="ui_modules_log_this">本次运行</string>
+    <string name="ui_modules_log_last">上次运行</string>
+    <string name="ui_modules_log_missing">没有上次日志文件</string>
     <string name="ui_modules_error">操作失败</string>
     <string name="ui_modules_exit">退出码</string>
-    <string name="ui_modules_invalid">脚本必须为 UTF-8，大小不超过 32 KiB，且不含 NUL 字符；KMI 必须为单行。</string>
+    <string name="ui_modules_invalid">脚本必须为 UTF-8，大小不超过 32 KiB，且不含 NUL 字符。</string>
     <string name="ui_modules_name">模块名称（可选）</string>
     <string name="ui_modules_script">Shell 脚本</string>
     <string name="ui_modules_import">导入脚本文件</string>
     <string name="ui_modules_manager_choose">选择已安装的管理器</string>
     <string name="ui_modules_manager">SU 管理器</string>
     <string name="ui_modules_no_managers">未找到兼容的 SU 管理器。</string>
-    <string name="ui_modules_kmi">KMI 覆盖（可选）</string>
     <string name="ui_modules_cancel">取消修改</string>
     <string name="ui_modules_save">保存模块</string>
     <string name="ui_modules_requirements_title">流程暂不可执行</string>
@@ -50,7 +53,7 @@
     <string name="module_condition_reboot_binary">软重启需要 /data/adb/ksud 或 /data/adb/apd，但两者均不存在或不可执行。</string>
     <string-array name="ui_modules_kinds">
         <item>Daemon 引导</item><item>Shell 脚本</item><item>SU 管理器 late-load</item><item>禁用 KernelSU 模块</item>
-        <item>保护只读分区</item><item>清理运行标志</item><item>卸载 dfroot 模块</item><item>软重启</item>
+        <item>保护只读分区</item><item>清理运行标志</item><item>卸载 dfroot 模块</item>
     </string-array>
     <string-array name="ui_modules_descriptions">
         <item>启动 DirtyFrag root daemon 控制通道。</item>
@@ -58,9 +61,8 @@
         <item>选择已安装管理器，并可在 late-load 后请求软重启。</item>
         <item>预填写的 Shell：加载管理器之前禁用 KernelSU 模块。</item>
         <item>预填写的 Shell：对分区应用只读保护。</item>
-        <item>预填写的 Shell：删除应用数据目录及 /dev/df* 旧运行标志，不卸载模块。</item>
+        <item>已停用：运行标志绑定内核 boot id，不再清理。</item>
         <item>预填写的 Shell：若 dfroot 仍在则执行 rmmod 卸载。</item>
-        <item>通过 /data/adb/ksud 或 /data/adb/apd 请求软重启。自动开关保持关闭，需要手动重新启用，以防重启循环。</item>
     </string-array>
     <string name="ui_modules_soft_reboot">加载后软重启</string>
     <string name="ui_modules_soft_reboot_note">需要 daemon，且必须为最后一个启用的模块。保留已启用的自动执行设置。</string>

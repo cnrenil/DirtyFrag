@@ -15,6 +15,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.*
 import androidx.lifecycle.lifecycleScope
 import df.root.daemon.Dfctl
+import df.root.script.BootMarkers
 import df.root.script.ModuleEngine
 import df.root.script.ModuleStore
 import df.root.shell.Privilege
@@ -42,25 +43,18 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             ModuleEngine.state.collect { execution ->
                 val saved = withContext(Dispatchers.IO) {
-                    ModuleStore.read(applicationContext) to runCatching {
-                        ModuleEngine.logFile(applicationContext).takeIf { it.isFile }?.readText().orEmpty()
-                    }.getOrDefault("")
+                    ModuleStore.read(applicationContext) to
+                        BootMarkers.has(applicationContext, BootMarkers.PLAN_DONE)
                 }
                 // Never ping the FIFO while a handed-off plan is running: the
                 // daemon is in run_plan() and will not reply, which used to
                 // taint the channel and leave the home screen on "未提权".
-                val daemonReady = withContext(Dispatchers.IO) {
-                    if (execution.running) {
-                        uiState.rooted || ModuleEngine.daemonProcessAlive(applicationContext)
-                    } else {
-                        Dfctl.forgetUnreachable(applicationContext)
-                        Shell.detect(applicationContext) != Privilege.App
-                    }
-                }
+                val daemonReady = probeRooted(execution.running)
                 uiState = uiState.copy(running = execution.running, runArmed = armed,
-                    rooted = daemonReady, failedRun = !execution.running && saved.first.lastFailure.isNotBlank(),
-                    hasRun = execution.output.isNotBlank() || saved.second.isNotBlank(),
-                    logText = execution.output.ifBlank { saved.second },
+                    rooted = daemonReady,
+                    failedRun = !execution.running && saved.first.lastFailure.isNotBlank() && !saved.second,
+                    hasRun = execution.running || execution.output.isNotBlank(),
+                    logText = execution.output,
                     progress1 = execution.progress,
                     progress2 = execution.progress,
                     statusLeft = execution.currentId?.let { id -> saved.first.steps.firstOrNull { it.id == id }?.let { it.name.ifBlank { it.kind.name } } }.orEmpty(),
@@ -111,24 +105,33 @@ class MainActivity : ComponentActivity() {
         // Never probe the FIFO from the main thread: a hung daemon would freeze
         // the UI. The result is published when it arrives.
         lifecycleScope.launch {
-            val ready = withContext(Dispatchers.IO) {
-                if (ModuleEngine.state.value.running) {
-                    uiState.rooted || ModuleEngine.daemonProcessAlive(applicationContext)
-                } else {
-                    Dfctl.forgetUnreachable(applicationContext)
-                    Shell.detect(applicationContext) != Privilege.App
-                }
-            }
+            val ready = probeRooted(ModuleEngine.state.value.running)
             uiState = uiState.copy(rooted = ready)
         }
     }
     override fun onStop() { armed = false; super.onStop() }
+
+    /**
+     * After KSU late-load the daemon exits because SELinux is enforcing.
+     * `plan-done` / `daemon-ready` for this boot still mean the device is rooted.
+     */
+    private suspend fun probeRooted(running: Boolean): Boolean = withContext(Dispatchers.IO) {
+        if (running) return@withContext uiState.rooted || ModuleEngine.daemonProcessAlive(applicationContext)
+        if (BootMarkers.thisBoot(applicationContext) || ModuleEngine.daemonProcessAlive(applicationContext)) return@withContext true
+        Dfctl.forgetUnreachable(applicationContext)
+        Shell.detect(applicationContext) != Privilege.App
+    }
 
     private val callbacks = object : MainCallbacks {
         override fun onCancelRunConfirmation() { armed = false }
         override fun onRunClick() {
             if (ModuleEngine.state.value.running) return
             if (!armed) { armed = true; return }
+            armed = false
+            ModuleEngine.launchManual(applicationContext)
+        }
+        override fun onConfirmRerun() {
+            if (ModuleEngine.state.value.running) return
             armed = false
             ModuleEngine.launchManual(applicationContext)
         }

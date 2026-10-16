@@ -61,19 +61,14 @@ object RuntimeFiles {
         file.appendText(text)
     }
 
-    /** Records a marker file, the coarse "which step did we reach" timeline. */
+    /** Writes a marker. [text] is the full file body (boot id first, then payload). */
     @JvmStatic
     fun marker(context: Context, name: String, text: String = ""): File {
         val file = File(markers(context), checkName(name))
         adopt(context, file)
         Os.chmod(file.absolutePath, 0x180) // 0600
-        if (text.isNotEmpty()) file.writeText(text)
+        file.writeText(text)
         return file
-    }
-
-    @JvmStatic
-    fun clearMarkers(context: Context) {
-        markers(context).listFiles()?.forEach { runCatching { it.delete() } }
     }
 
     private class Owner(val uid: Int, val gid: Int)

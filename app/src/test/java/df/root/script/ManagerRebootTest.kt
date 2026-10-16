@@ -12,43 +12,21 @@ class ManagerRebootTest {
         val plan = ModulePlan(steps = listOf(manager.copy(softReboot = true)), onAppOpen = true, onBoot = true,
             lastFailure = "old", revision = 8)
         val reset = ModuleDefaults.reset(plan)
-        assertEquals(listOf(ModuleKind.DAEMON, ModuleKind.SHELL, ModuleKind.SHELL, ModuleKind.MANAGER), reset.steps.map { it.kind })
-        assertEquals(listOf("", ScriptPresets.PARTITIONS_RO, ScriptPresets.UNLOAD_MODULE, ""), reset.steps.map { it.script })
+        assertEquals(listOf(ModuleKind.DAEMON, ModuleKind.SHELL, ModuleKind.MANAGER), reset.steps.map { it.kind })
+        assertEquals(listOf("", ScriptPresets.PARTITIONS_RO, ""), reset.steps.map { it.script })
         assertEquals(8L, reset.revision)
         assertEquals("test.manager", reset.steps.last().managerPackage)
         assertFalse(reset.steps.last().softReboot)
         assertFalse(reset.onAppOpen)
         assertFalse(reset.onBoot)
         assertEquals("", reset.lastFailure)
-        assertFalse(ModuleDefaults.providers.contains(ModuleKind.SOFT_REBOOT))
+        assertFalse(ModuleDefaults.providers.contains(ModuleKind.CLEAN_MARKERS))
     }
     @Test fun enabledManagerRebootKeepsAutomaticFlags() {
         val plan = ModulePlan(steps = listOf(manager.copy(softReboot = true)), onAppOpen = true, onBoot = true)
         assertTrue(ModulePolicy.completed(plan).onBoot)
         assertTrue(ModulePolicy.completed(plan).onAppOpen)
         assertTrue(ModulePolicy.completed(plan.copy(steps = listOf(manager.copy(softReboot = true, enabled = false)))).onBoot)
-    }
-    @Test fun migrationAttachesEnabledLegacyRebootAndIsIdempotent() {
-        val old = ModulePlan(steps = listOf(manager, ModuleStep(kind = ModuleKind.SOFT_REBOOT)), onBoot = true, revision = 3)
-        val migrated = ModuleMigration.reboots(old)
-        assertEquals(listOf(manager.copy(softReboot = true)), migrated.steps)
-        assertFalse(migrated.onBoot)
-        assertEquals(3L, migrated.revision)
-        assertEquals(migrated, ModuleMigration.reboots(migrated))
-    }
-    @Test fun disabledLegacyRebootStaysDisabledAndDisabledManagerIsNotEnabled() {
-        val disabledReboot = ModuleMigration.reboots(ModulePlan(steps = listOf(manager, ModuleStep(kind = ModuleKind.SOFT_REBOOT, enabled = false))))
-        assertFalse(disabledReboot.steps.single().softReboot)
-        val disabledManager = ModuleMigration.reboots(ModulePlan(steps = listOf(manager.copy(enabled = false), ModuleStep(kind = ModuleKind.SOFT_REBOOT))))
-        assertFalse(disabledManager.steps.single().enabled)
-        assertFalse(disabledManager.steps.single().softReboot)
-        assertTrue(disabledManager.lastFailure.contains("could not be enabled safely"))
-    }
-    @Test fun orphanRebootMigrationReportsLostActionAndDisarms() {
-        val migrated = ModuleMigration.reboots(ModulePlan(steps = listOf(ModuleStep(kind = ModuleKind.SOFT_REBOOT)), onBoot = true))
-        assertTrue(migrated.steps.isEmpty())
-        assertTrue(migrated.lastFailure.isNotBlank())
-        assertFalse(migrated.onBoot)
     }
     @Test fun suAloneCannotPerformRebootHandshake() {
         val issues = ModulePreflight.inspect(ModulePlan(steps = listOf(manager.copy(softReboot = true))), env)

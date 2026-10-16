@@ -15,15 +15,6 @@ internal object ModuleKmi {
         return "${match.groupValues[2]}-${match.groupValues[1]}"
     }
 
-    fun resolve(context: Context, override: String = ""): String? =
-        resolve(override, Kmi.readSelection(context).branch, Kmi.readInfo().detectedBranch)
-
-    fun snapshot(context: Context, plan: ModulePlan): ModulePlan {
-        val selection = Kmi.readSelection(context).branch
-        val detected = Kmi.readInfo().detectedBranch
-        return plan.copy(steps = plan.steps.map { step ->
-            if (step.enabled && step.kind == ModuleKind.MANAGER)
-                step.copy(kmi = resolve(step.kmi, selection, detected).orEmpty()) else step
-        })
-    }
+    fun resolve(context: Context): String? =
+        resolve("", Kmi.readSelection(context).branch, Kmi.readInfo().detectedBranch)
 }
