@@ -8,8 +8,7 @@ import java.io.File
  * Everything a run leaves behind lives under the app's device-protected data
  * directory, never under /dev.
  *
- * Two reasons. /dev is not ours: it is a tmpfs the vendor owns, a stray
- * /dev/df* from a previous run is indistinguishable from this one, and nothing
+ * Two reasons. /dev is not ours: it is a tmpfs the vendor owns, and nothing
  * in the app can read it back. A file in the app's own tree can be read
  * afterwards, so a marker's presence and mtime become a usable timeline.
  *

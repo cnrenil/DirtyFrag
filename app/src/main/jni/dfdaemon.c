@@ -757,8 +757,8 @@ static void handle_line(char *line)
         step_log("late-load exit=%d", rc);
         if (reboot) {
             if (rc == 0) {
-                step_log("late-load succeeded; waiting 2 seconds before soft reboot");
-                sleep(2);
+                step_log("late-load succeeded; waiting 4 seconds before soft reboot");
+                sleep(4);
                 request_soft_reboot(verb, 1);
             } else step_log("soft-reboot cancelled: late-load failed exit=%d; daemon exiting", rc);
         } else reply("%s %s exit=%d", rc == 0 ? DFCTL_OK : DFCTL_ERR, verb, rc);
@@ -1106,8 +1106,8 @@ static int run_plan_line(char *line)
         step_log("plan lateload id=%s exit=%d", id, rc);
         if (reboot) {
             if (rc == 0) {
-                step_log("late-load succeeded; waiting 2 seconds before soft reboot");
-                sleep(2);
+                step_log("late-load succeeded; waiting 4 seconds before soft reboot");
+                sleep(4);
                 request_soft_reboot("late-load", 1);
             } else {
                 step_log("soft-reboot cancelled: late-load failed exit=%d", rc);

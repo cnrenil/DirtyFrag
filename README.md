@@ -168,8 +168,8 @@ next privileged call to the hooked function runs the shellcode, which loads the 
 3. **dfroot.ko -> vendor_file** - the kernel module is written through that bridge into a
    `vendor_file`-labelled file.
 4. **libc++ hook** (fires in init, uid=0, tid=1) - shellcode patched at
-   `std::ostream::sentry::sentry()`. It checks uid and tid, creates `/dev/df` as a one-shot mutex so
-   it cannot re-enter, then clones a helper that execs `insmod` as `vendor_modprobe`. The kernel
+   `std::ostream::sentry::sentry()`. It checks uid and tid, then clones a helper that execs
+   `insmod` as `vendor_modprobe`. The kernel
    module starts the daemon itself; the helper does not wait for insmod or exec the daemon.
 5. **dfroot.ko init** - sets SELinux permissive, text-patches DEFEX and Oppo handlers to return 0
    instead of leaving kprobes planted, `rmmod`s Oppo security modules if present, then uses

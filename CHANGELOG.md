@@ -66,7 +66,7 @@
 ### Diagnostics
 - Run markers moved out of `/dev` to `/data/user_de/0/df.root/markers/`. `/dev` is a vendor tmpfs the
   app cannot read back, so those markers were write-only and a stale one was indistinguishable from a
-  device node. The libc++ one-shot mutex at `/dev/df` stays where it is: it is a mutex, not a marker.
+  device node. libcxx.S no longer creates a mutex file.
 - Every marker and log is chowned with **both** uid and gid to the app before use. A uid-only chown
   left the group as root, which is how markers ended up unreadable by the app that asked for them.
 - Logs are per run: `/data/user_de/0/df.root/daemon/run-<trigger>-<timestamp>.log`, with the daemon's
