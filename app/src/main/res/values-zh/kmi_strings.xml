@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="kmi_title">KMI 信息</string>
+    <string name="daemon_title">Daemon 终端</string>
+    <string name="kmi_back">返回</string>
+    <string name="kmi_device">设备信息</string>
+    <string name="kmi_choose">选择 KMI 分支</string>
+    <string name="kmi_reset">恢复自动显示</string>
+    <string name="kmi_auto">自动（从内核版本读取）</string>
+    <string name="kmi_unknown">未知 / 无法获取</string>
+    <string name="kmi_selected_auto">自动：%1$s</string>
+    <string name="kmi_selected_manual">手动：%1$s</string>
+    <string name="kmi_details">设备\n%1$s\n\nAndroid\n%2$s（API %3$d）\n\nAndroid 安全补丁\n%4$s\n\n内核版本\n%5$s\n\n架构\n%6$s\n\n检测到的分支\n%7$s\n\n完整 KMI 版本\n%8$s</string>
+    <string name="kmi_note">手动选择会在下次运行漏洞利用时生效；自动模式会跟随当前运行的内核版本。本页面不验证模块兼容性。</string>
+    <string name="vermagic_title">Vermagic 模式</string>
+    <string name="vermagic_choose">选择 vermagic 来源</string>
+    <string name="vermagic_builtin">内置模块值</string>
+    <string name="vermagic_vivo">预填写：vivo</string>
+    <string name="vermagic_android">预填写：标准 Android</string>
+    <string name="vermagic_custom">完全自定义</string>
+    <string name="vermagic_custom_hint">完整 vermagic 字符串</string>
+    <string name="vermagic_apply">使用当前值</string>
+    <string name="vermagic_reset">恢复内置值</string>
+    <string name="vermagic_current">当前：%1$s</string>
+    <string name="vermagic_builtin_value">使用 ko 内置值，不进行替换。</string>
+    <string name="vermagic_empty">尚未填写自定义 vermagic。</string>
+    <string name="vermagic_invalid">Vermagic 不能包含换行符或 NUL 字符。</string>
+    <string name="vermagic_note">所选值会以 --vermagic 传给漏洞利用程序；内置模式不传该参数。</string>
+</resources>

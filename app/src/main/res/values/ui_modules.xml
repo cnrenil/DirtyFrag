@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ui_modules_title">Script modules</string>
+    <string name="ui_modules_back">Back</string>
+    <string name="ui_modules_app">Run modules on app launch</string>
+    <string name="ui_modules_boot">Run modules after boot</string>
+    <string name="ui_modules_failure_policy">Stop after failure</string>
+    <string name="ui_modules_failure_note">A failed or interrupted run stops the plan and turns off automatic app and boot execution. Review the log before enabling them again.</string>
+    <string name="ui_modules_interrupted">Interrupted module: %1$s</string>
+    <string name="ui_modules_order">Module order</string>
+    <string name="ui_modules_add">Add module</string>
+    <string name="ui_modules_choose">Choose a module provider</string>
+    <string name="ui_modules_legacy">Reset to preset</string>
+    <string name="ui_modules_empty">No modules. Add a provider to start.</string>
+    <string name="ui_modules_current">Executing this module</string>
+    <string name="ui_modules_enabled">Enable module</string>
+    <string name="ui_modules_up">Move up</string>
+    <string name="ui_modules_down">Move down</string>
+    <string name="ui_modules_remove">Remove</string>
+    <string name="ui_modules_unsaved">Save or cancel your module changes before running the plan.</string>
+    <string name="ui_modules_run">Run saved module plan</string>
+    <string name="ui_modules_output">Output and log</string>
+    <string name="ui_modules_no_output">No module output yet</string>
+    <string name="ui_modules_log">View latest log</string>
+    <string name="ui_modules_error">Operation failed</string>
+    <string name="ui_modules_exit">Exit code</string>
+    <string name="ui_modules_invalid">Shell content must be UTF-8, at most 32 KiB, and contain no NUL characters. KMI must be a single line.</string>
+    <string name="ui_modules_name">Optional module name</string>
+    <string name="ui_modules_script">Shell script</string>
+    <string name="ui_modules_import">Import script file</string>
+    <string name="ui_modules_manager_choose">Select an installed manager</string>
+    <string name="ui_modules_manager">SU manager</string>
+    <string name="ui_modules_no_managers">No compatible SU managers found.</string>
+    <string name="ui_modules_kmi">Optional KMI override</string>
+    <string name="ui_modules_cancel">Cancel changes</string>
+    <string name="ui_modules_save">Save module</string>
+    <string name="ui_modules_requirements_title">Plan cannot run yet</string>
+    <string name="ui_modules_requirements_summary">Some modules are missing a required condition. Nothing was executed. Fix them and run again.</string>
+    <string name="ui_modules_requirement_step">Step %1$d · %2$s (%3$s)</string>
+    <string name="ui_modules_requirements_dismiss">Close</string>
+    <string name="ui_modules_open_log">Open run log</string>
+    <string name="module_condition_empty_plan">No module is enabled. Enable at least one before running.</string>
+    <string name="module_condition_empty_script">This shell module has no script content.</string>
+    <string name="module_condition_manager_required">No SU manager selected. Choose the installed manager for this module.</string>
+    <string name="module_condition_manager_missing">The selected SU manager is not installed or was uninstalled. Select it again.</string>
+    <string name="module_condition_manager_library">The selected SU manager no longer provides the expected late-load library. Select the manager again.</string>
+    <string name="module_condition_native_missing">The native bootstrap libraries are missing from this build and the device is not rooted yet.</string>
+    <string name="module_condition_root_required">This module needs root or a running daemon. Add a daemon bootstrap module before it.</string>
+    <string name="module_condition_reboot_manager">Soft reboot needs an SU manager with a late-load backend. Add an SU manager module before it.</string>
+    <string name="module_condition_reboot_binary">Soft reboot needs /data/adb/ksud or /data/adb/apd, and neither is present and executable.</string>
+    <string-array name="ui_modules_kinds">
+        <item>Daemon bootstrap</item><item>Shell script</item><item>SU manager late-load</item><item>Disable KernelSU modules</item>
+        <item>Protect read-only partitions</item><item>Clean run markers</item><item>Unload dfroot module</item><item>Soft reboot</item>
+    </string-array>
+    <string-array name="ui_modules_descriptions">
+        <item>Start the DirtyFrag root daemon control channel.</item>
+        <item>Execute saved shell content using the available privilege.</item>
+        <item>Pick an installed manager; optionally request soft reboot after late-load.</item>
+        <item>Pre-filled shell: disable KernelSU modules before loading the manager.</item>
+        <item>Pre-filled shell: apply read-only protection to partitions.</item>
+        <item>Pre-filled shell: delete app-data run markers and legacy /dev/df* markers; no module is unloaded.</item>
+        <item>Pre-filled shell: run rmmod dfroot if the module is still loaded.</item>
+        <item>Request a soft reboot through /data/adb/ksud or /data/adb/apd. Automatic switches remain off until manually enabled again.</item>
+    </string-array>
+    <string name="ui_modules_soft_reboot">Soft reboot after loading</string>
+    <string name="ui_modules_soft_reboot_note">Requires the daemon and must be the last enabled step. Keeps your automatic execution settings.</string>
+    <string name="module_condition_reboot_final">A manager with soft reboot must be the last enabled module. Move it to the end or disable soft reboot.</string>
+    <string name="module_condition_kmi_unresolved">The manager KMI cannot be resolved. Select a valid KMI branch in Settings.</string>
+    <string name="module_condition_daemon_required">Soft reboot requires the daemon handshake. Add a daemon module before this manager; SU alone is insufficient.</string>
+    <string name="ui_modules_configuration">Module configuration</string>
+</resources>

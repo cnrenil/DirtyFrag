@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="kmi_title">KMI information</string>
+    <string name="daemon_title">Daemon terminal</string>
+    <string name="kmi_back">Back</string>
+    <string name="kmi_device">Device information</string>
+    <string name="kmi_choose">Choose KMI branch</string>
+    <string name="kmi_reset">Restore automatic display</string>
+    <string name="kmi_auto">Automatic (from kernel release)</string>
+    <string name="kmi_unknown">Unknown / unavailable</string>
+    <string name="kmi_selected_auto">Automatic: %1$s</string>
+    <string name="kmi_selected_manual">Manual: %1$s</string>
+    <string name="kmi_details">Device\n%1$s\n\nAndroid\n%2$s (API %3$d)\n\nAndroid security patch\n%4$s\n\nKernel release\n%5$s\n\nArchitecture\n%6$s\n\nDetected branch\n%7$s\n\nFull KMI version\n%8$s</string>
+    <string name="kmi_note">A manual selection is used by the next exploit run. Automatic selection follows the running kernel release. This page does not verify module compatibility.</string>
+    <string name="vermagic_title">Vermagic mode</string>
+    <string name="vermagic_choose">Choose vermagic source</string>
+    <string name="vermagic_builtin">Built-in module value</string>
+    <string name="vermagic_vivo">Prefilled: vivo</string>
+    <string name="vermagic_android">Prefilled: standard Android</string>
+    <string name="vermagic_custom">Fully custom</string>
+    <string name="vermagic_custom_hint">Complete vermagic string</string>
+    <string name="vermagic_apply">Use current value</string>
+    <string name="vermagic_reset">Restore built-in value</string>
+    <string name="vermagic_current">Current: %1$s</string>
+    <string name="vermagic_builtin_value">Bundled ko value is used unchanged.</string>
+    <string name="vermagic_empty">No custom vermagic entered.</string>
+    <string name="vermagic_invalid">Vermagic must not contain newlines or NUL characters.</string>
+    <string name="vermagic_note">The selected value is passed to the exploit as --vermagic. Built-in mode does not pass the option.</string>
+    <string-array name="kmi_branches" translatable="false">
+        <item>android12-5.10</item>
+        <item>android13-5.10</item>
+        <item>android13-5.15</item>
+        <item>android14-5.15</item>
+        <item>android14-6.1</item>
+        <item>android15-6.6</item>
+        <item>android16-6.12</item>
+        <item>android17-6.18</item>
+    </string-array>
+</resources>

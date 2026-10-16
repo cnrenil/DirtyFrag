@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ui_scripts_entry_summary">Order modules, configure managers and import SH scripts</string>
+    <string name="ui_scripts_title">Script modules</string>
+    <string name="ui_scripts_back">Back</string>
+    <string name="ui_scripts_description">Both scripts are disabled by default. Scripts use the highest available privilege; root access is not guaranteed. Manual run executes the saved script even when its switch is off.</string>
+    <string name="ui_scripts_app_open_group">App launch</string>
+    <string name="ui_scripts_boot_group">Device boot</string>
+    <string name="ui_scripts_app_open_summary">Runs once for each fresh Activity launch, not when configuration changes recreate it.</string>
+    <string name="ui_scripts_boot_summary">Uses the scripts boot receiver independently of root autorun. When root autorun is enabled, this script runs after it.</string>
+    <string name="ui_scripts_edit">Edit script</string>
+    <string name="ui_scripts_empty">No saved commands</string>
+    <string name="ui_scripts_saved">Saved commands are ready to edit or run</string>
+    <string name="ui_scripts_run">Run saved script now</string>
+    <string name="ui_scripts_output_group">Output and latest log</string>
+    <string name="ui_scripts_no_log">No output or script log yet</string>
+    <string name="ui_scripts_refresh">View latest log</string>
+    <string name="ui_scripts_editor_title">Edit script</string>
+    <string name="ui_scripts_editor_summary">Presets replace the editor draft only. Save to apply changes; Cancel leaves the saved script unchanged.</string>
+    <string name="ui_scripts_preset">Insert preset</string>
+    <string name="ui_scripts_editor_hint">Shell commands</string>
+    <string name="ui_scripts_invalid">Script must be at most 32 KiB in UTF-8 and contain no NUL characters.</string>
+    <string name="ui_scripts_cancel">Cancel</string>
+    <string name="ui_scripts_save">Save</string>
+    <string name="ui_scripts_error">Operation failed</string>
+    <string name="ui_scripts_busy">Working…</string>
+    <string name="ui_scripts_exit">Exit code</string>
+    <string-array name="ui_scripts_triggers">
+        <item>Run on app launch</item>
+        <item>Run after boot</item>
+    </string-array>
+    <string-array name="ui_scripts_presets">
+        <item>Select a preset</item>
+        <item>Diagnostics</item>
+        <item>Late load</item>
+        <item>Clean markers</item>
+        <item>Unload module</item>
+        <item>Cleanup</item>
+    </string-array>
+</resources>

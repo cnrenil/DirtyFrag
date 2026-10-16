@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ui_modules_title">脚本模块</string>
+    <string name="ui_modules_back">返回</string>
+    <string name="ui_modules_app">打开应用时执行模块</string>
+    <string name="ui_modules_boot">开机后执行模块</string>
+    <string name="ui_modules_failure_policy">失败后停止执行</string>
+    <string name="ui_modules_failure_note">执行失败或中断会停止流程，并关闭打开应用与开机自动执行。检查日志后再重新启用。</string>
+    <string name="ui_modules_interrupted">上次中断的模块：%1$s</string>
+    <string name="ui_modules_order">模块顺序</string>
+    <string name="ui_modules_add">添加模块</string>
+    <string name="ui_modules_choose">选择模块提供者</string>
+    <string name="ui_modules_legacy">重置为预设</string>
+    <string name="ui_modules_empty">尚无模块，请添加模块提供者。</string>
+    <string name="ui_modules_current">正在执行此模块</string>
+    <string name="ui_modules_enabled">启用模块</string>
+    <string name="ui_modules_up">上移</string>
+    <string name="ui_modules_down">下移</string>
+    <string name="ui_modules_remove">移除</string>
+    <string name="ui_modules_unsaved">执行流程前，请先保存或取消模块修改。</string>
+    <string name="ui_modules_run">执行已保存的模块流程</string>
+    <string name="ui_modules_output">输出与日志</string>
+    <string name="ui_modules_no_output">暂无模块输出</string>
+    <string name="ui_modules_log">查看最近日志</string>
+    <string name="ui_modules_error">操作失败</string>
+    <string name="ui_modules_exit">退出码</string>
+    <string name="ui_modules_invalid">脚本必须为 UTF-8，大小不超过 32 KiB，且不含 NUL 字符；KMI 必须为单行。</string>
+    <string name="ui_modules_name">模块名称（可选）</string>
+    <string name="ui_modules_script">Shell 脚本</string>
+    <string name="ui_modules_import">导入脚本文件</string>
+    <string name="ui_modules_manager_choose">选择已安装的管理器</string>
+    <string name="ui_modules_manager">SU 管理器</string>
+    <string name="ui_modules_no_managers">未找到兼容的 SU 管理器。</string>
+    <string name="ui_modules_kmi">KMI 覆盖（可选）</string>
+    <string name="ui_modules_cancel">取消修改</string>
+    <string name="ui_modules_save">保存模块</string>
+    <string name="ui_modules_requirements_title">流程暂不可执行</string>
+    <string name="ui_modules_requirements_summary">部分模块缺少必需条件，未执行任何操作。请修正后重试。</string>
+    <string name="ui_modules_requirement_step">第 %1$d 步 · %2$s（%3$s）</string>
+    <string name="ui_modules_requirements_dismiss">关闭</string>
+    <string name="ui_modules_open_log">打开运行日志</string>
+    <string name="module_condition_empty_plan">没有启用任何模块，请至少启用一个再执行。</string>
+    <string name="module_condition_empty_script">该 Shell 模块没有脚本内容。</string>
+    <string name="module_condition_manager_required">未选择 SU 管理器，请为该模块选择已安装的管理器。</string>
+    <string name="module_condition_manager_missing">所选 SU 管理器未安装或已被卸载，请重新选择。</string>
+    <string name="module_condition_manager_library">所选 SU 管理器不再提供预期的 late-load 库，请重新选择管理器。</string>
+    <string name="module_condition_native_missing">当前构建缺少原生引导库，且设备尚未获得 root。</string>
+    <string name="module_condition_root_required">该模块需要 root 或已运行的 daemon，请在其之前添加 Daemon 引导模块。</string>
+    <string name="module_condition_reboot_manager">软重启需要带 late-load 后端的 SU 管理器，请在其之前添加 SU 管理器模块。</string>
+    <string name="module_condition_reboot_binary">软重启需要 /data/adb/ksud 或 /data/adb/apd，但两者均不存在或不可执行。</string>
+    <string-array name="ui_modules_kinds">
+        <item>Daemon 引导</item><item>Shell 脚本</item><item>SU 管理器 late-load</item><item>禁用 KernelSU 模块</item>
+        <item>保护只读分区</item><item>清理运行标志</item><item>卸载 dfroot 模块</item><item>软重启</item>
+    </string-array>
+    <string-array name="ui_modules_descriptions">
+        <item>启动 DirtyFrag root daemon 控制通道。</item>
+        <item>使用可用权限执行已保存的 shell 内容。</item>
+        <item>选择已安装管理器，并可在 late-load 后请求软重启。</item>
+        <item>预填写的 Shell：加载管理器之前禁用 KernelSU 模块。</item>
+        <item>预填写的 Shell：对分区应用只读保护。</item>
+        <item>预填写的 Shell：删除应用数据目录及 /dev/df* 旧运行标志，不卸载模块。</item>
+        <item>预填写的 Shell：若 dfroot 仍在则执行 rmmod 卸载。</item>
+        <item>通过 /data/adb/ksud 或 /data/adb/apd 请求软重启。自动开关保持关闭，需要手动重新启用，以防重启循环。</item>
+    </string-array>
+    <string name="ui_modules_soft_reboot">加载后软重启</string>
+    <string name="ui_modules_soft_reboot_note">需要 daemon，且必须为最后一个启用的模块。保留已启用的自动执行设置。</string>
+    <string name="module_condition_reboot_final">启用软重启的管理器必须为最后一个启用的模块，请移至末尾或关闭软重启。</string>
+    <string name="module_condition_kmi_unresolved">无法解析管理器 KMI，请在设置中选择有效的 KMI 分支。</string>
+    <string name="module_condition_daemon_required">软重启需要 daemon 握手，请在管理器之前添加 Daemon 模块；只有 SU 权限无法执行。</string>
+    <string name="ui_modules_configuration">模块配置</string>
+</resources>

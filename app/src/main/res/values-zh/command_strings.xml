@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="menu_commands">命令与脚本</string>
+    <string name="commands_title">命令与脚本</string>
+    <string name="commands_back">返回</string>
+    <string name="commands_preload_title">late-load 之前</string>
+    <string name="commands_preload_note">以 root 身份在所选 SU late-load（实际 insmod 阶段）之前执行。失败只记录日志，不会阻断 late-load。</string>
+    <string name="commands_postload_title">late-load 之后</string>
+    <string name="commands_postload_note">在 late-load 成功后、可选软重启之前以 root 身份执行。失败只记录日志，不会阻断流程。</string>
+    <string name="commands_preload_enabled">已启用：下次运行在 late-load / insmod 之前执行。</string>
+    <string name="commands_postload_enabled">已启用：下次运行在 late-load / insmod 之后执行。</string>
+    <string name="commands_hook_disabled">未启用：脚本为空。</string>
+    <string name="commands_script_hint">每行一条 shell 命令；以 # 开头的行为注释。</string>
+    <string name="commands_save">保存</string>
+    <string name="commands_clear">清空</string>
+    <string name="commands_run_script">以应用身份运行</string>
+    <string name="commands_saved">脚本已保存</string>
+    <string name="commands_save_failed">保存失败：%1$s</string>
+    <string name="commands_terminal_title">Shell</string>
+    <string name="commands_terminal_note">通过 /system/bin/sh 执行。未 root 时使用应用 UID；root 后可通过管理器提供的 SU 命令执行。</string>
+    <string name="commands_terminal_hint">命令</string>
+    <string name="commands_run">运行命令</string>
+    <string name="commands_running">运行中…</string>
+    <string name="commands_output_empty">无输出</string>
+</resources>

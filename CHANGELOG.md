@@ -2,143 +2,69 @@
 
 ## Unreleased
 
-- Watching [chisewaguri/DFRoot](https://github.com/chisewaguri/DFRoot/tree/upstream-standalone): it drops
-  the separate bootstrap binary and the staged copy of ksud, and has the kernel module exec the selected
-  manager's own `libksud.so`, passing the package name and both switches as insmod parameters. That is
-  worth taking once it is rebased onto upstream 4.5 and lands upstream - on its own the branch re-adds the
-  `rmmod oplus_*` chain behind issue #21, and it only writes the `dfm0`/`dfm1` markers our progress bar
-  does not read.
+### LKM / bootstrap (selective from upstream DFRoot)
+- Stop stripping `.note.gnu.build-id` from `dfroot.ko` (Makefile and CI). Some loaders need it.
+- Replace live DEFEX kprobes with `aarch64_insn_patch_text` so the functions return 0
+  (`BTI C` / `MOV x0,#0` / `RET`). RETAA/RETAB are not used: they are undefined on CPUs
+  without pointer auth. The same helper patches Oppo `oplus_exe_block_ret_handler` /
+  `oplus_root_check_post_handler` when `module_kallsyms_lookup_name` can see them.
+- Keep the Oppo `rmmod` of `oplus_secure_harden` / `oplus_security_keventupload` /
+  `oplus_security_guard` in the usermode helper: the new patches are the primary bypass, rmmod is
+  the 4.0/4.1 fallback and is a no-op when those modules are absent.
+- The helper still writes the app-data `kernel-module` marker (not `/dev/dfm0`), sets
+  `u:r:init:s0` on `/proc/self/attr/exec`, then `exec`s `/data/user_de/0/df.root/daemon` with
+  `UMH_WAIT_EXEC`. Init returns `-ENODEV` so the module unloads. libc++ shellcode no longer
+  waits for insmod or execs the daemon.
+- dfdaemon switches `/proc/self/attr/current` to `u:r:init:s0` while SELinux is still permissive
+  (KSU only allows init to enter the ksud domain). Late-load children do the same.
+- **Unload dfroot** is `rmmod dfroot 2>/dev/null || true` so the default plan does not fail after
+  the module has already self-unloaded.
 
-## 1.16
+### Daemon plan handoff
+- Running a module plan no longer waits for the FIFO after **Start daemon**. The app writes the
+  remaining steps (parameters included) under `files/runs/` and dfdaemon consumes that plan as soon
+  as it is ready, then again while it is serving.
+- Every step except daemon bootstrap and SU-manager late-load is a shell script. Partition
+  protection, KSU-module disable, marker cleanup, unload and custom SH files are `sh` files the
+  daemon execs; late-load stays the native `libksud.so`/`libapd.so` path, with optional soft reboot.
+- **Protect read-only partitions**, **Disable KernelSU modules**, **Clean run markers** and
+  **Unload dfroot** are SHELL presets: adding or resetting them creates an editable shell module
+  with the previous command already filled in. Only daemon bootstrap and SU-manager late-load stay
+  native.
 
-Based on upstream DFRoot 4.5 (upstream 4.2 - 4.5 merged into this fork).
+### Script modules
+- Script modules moved to their own destination in the bottom bar, next to Home and Terminal, instead
+  of being a card that opened the page from Status. Settings is now an overlay reachable from the
+  same bar.
+- A plan is checked against the device before anything runs. Missing prerequisites - no manager
+  selected, the selected manager uninstalled or no longer shipping its library, a step that needs
+  root with no daemon before it, a soft reboot with no executable `/data/adb/ksud` or `/data/adb/apd` -
+  open a dialog naming the step, and nothing is executed. The check is sequential, so a daemon or
+  manager step satisfies the steps that follow it.
+- The SU manager and its backend are one choice, not two. `ksud` and `apd` belong to the package that
+  ships them, so the picker shows the manager with its backend in parentheses and the separate
+  backend dropdown is gone.
+- **Load manager** execs `libksud.so`/`libapd.so` directly from the manager's own native library
+  directory. The copy into the app's data directory is gone: it was a second file to keep in sync,
+  and the copy - not the library - was what SELinux refused to exec.
+- **Soft reboot** uses `/data/adb/ksud` or `/data/adb/apd`, and reports a clear error when neither is
+  present and executable, rather than relying on staged duplicates.
+- The daemon's legacy `late-load` verb resolves to the same installed binary.
 
-### Engine - vendor hardening is patched in place instead of removed (issue #21)
-- The kernel module no longer runs `rmmod oplus_secure_harden`, `rmmod oplus_security_keventupload` and
-  `rmmod oplus_security_guard`. Removing those modules on an Oppo/OnePlus kernel tripped the vendor
-  security anti-tamper path and the device rebooted to a black screen on every run - reported on a OnePlus
-  Ace6 (VT0X5AOWUU7U/ocloud-cn, N123, ColorOS 16.0.7.101).
-- A new `patch_fn_ret_zero()` writes `mov w0, #0; ret` over the first two instructions of the handlers
-  that were causing the trouble, so the modules stay loaded and their checks simply return allowed. It is
-  applied to `oplus_exe_block_ret_handler` and `oplus_root_check_post_handler`, found through
-  `module_kallsyms_lookup_name`, and to Samsung's `task_defex_enforce` and `task_defex_user_exec`, which
-  in 1.15 were kprobes that rewrote `x0` on every hit. The patcher skips a `BTI`/`PACIASP`/`PACIBSP`
-  preamble and emits `retaa`/`retab` only when the SoC really has pointer authentication.
-- `call_usermodehelper_exec` is called with `UMH_WAIT_EXEC` instead of `UMH_WAIT_PROC`, so the module no
-  longer waits for the helper's exit status. That wait is the other half of the MTK reboot, and the status
-  it reported is what a Samsung saw as `returned 256` in 1.15 (issue #5). The helper command is now simply
-  `touch /dev/dfm0; exec /data/user_de/0/df.root/bootstrap`, so the `exit 0` workaround from 1.15 is gone:
-  there is no longer a failing command at the end of the chain to mask.
-- Housekeeping around the module: it now fails its own init with `-ENODEV` to get itself unloaded, and
-  bootstrap runs `rmmod dfroot` once late-load has finished and before a soft-reboot, rather than only at
-  the very end where a reboot skipped it.
-- The `.ko` keep their `.note.gnu.build-id` section. Upstream stopped stripping it, which is what kept a
-  Galaxy A34 (SM-A346M, kernel 6.6.92) from loading the module at all.
-
-### Engine - the payload gets a place to live on more devices
-- The loader used to put the shellcode straight after the end of the executable `PT_LOAD` segment and give
-  up if the remaining slack in that page was too small, with a bare `[-] Failed to find a suitable code
-  cave`. It now scans the executable segment for a run of zero bytes - the alignment padding between
-  functions - that is big enough, prints the offset it chose, and reports the largest run it found when
-  there is none, so a log says something useful instead of nothing.
-- The hook site preamble is now recognised properly: `PACIASP`, `PACIBSP`, `BTI`, `BTI c`, `BTI j` and
-  `BTI jc`, up to two words deep, where before only `PACIASP` and one form of `BTI` were handled once.
-- With the shellcode no longer always at the end of the segment, the branch back to the hook and the saved
-  first instruction were being written into the wrong buffer, which produced a patch that crashed instead
-  of hopping. Both are now written into the padded buffer that is actually placed in the cave.
-
-### App
-- The run banner in the advanced log opens with `app version:`, so a pasted log says which build produced
-  it; it reads the same `BuildConfig.VERSION_NAME` the header used to carry.
-- `run()` is `synchronized` and returns early when `/dev/df` already exists, so the boot autorun racing a
-  manual tap no longer re-hooks over the first run and corrupts it.
-- The manager check became a `hasKsud()` helper, which tests `nativeLibraryDir` for null first.
-- The interface keeps its own scale. Every measurement in it belongs to one screen width in dp - the Run
-  pill is 48% of its parent minus a fixed 66dp, the toolbar and the 54dp circles are fixed dp holding sp
-  text - so a single One UI screen zoom step throws the pill allowance off and clips the title, and default
-  zoom breaks it outright. `MainActivity` now wraps its base context through `ScaleFix`, which derives a
-  density from the real pixel width so the app always lays out at 384dp, the width of a Galaxy S25 at
-  450dpi, and pins `fontScale` to 1.0 because the Font size slider breaks those same containers on its own
-  account. The correction is capped at 30% either side of what the device reports, and it returns the base
-  context untouched at the calibration width, so a device already there pays nothing. Verified on a Galaxy
-  S25 (SM-S931B): identical at every screen zoom and font size step. The price is that the system's own
-  Screen zoom and Font size no longer apply inside the app.
-- Wide screens are the known gap in that lock, not a solved case. The correction is capped at 30% either
-  side of the density the device reports, and a foldable opened flat, or a tablet, needs more than that to
-  reach 384dp from its pixel width, so there the canvas settles wider than the layout expects instead of
-  exactly on it. Phone widths are what was measured and verified; a foldable or tablet runs, but the pill
-  allowance and the toolbar alignment are not guaranteed to hold there.
-- An **Odin** pill sits left of the menu button in the toolbar, cut from the same cloth as that button - the
-  same 44dp height and the same #1C1C1C capsule - and its dot says whether this firmware will let the device
-  into Odin. Galaxy firmwares from around April 2026 answer download mode with a D2 error while the device
-  has a lock-screen credential, because `DmcService` in `system_server` writes `[lock, maintenance,
-  at_command]` into a vaultkeeper trustlet in the TEE and the bootloader refuses Odin on `[1, 0, 0]`. That
-  vault is behind a signature-or-privileged permission, and DirtyFrag is deliberately not a root client - it
-  is the tool that gets you root, so it has to work on a device that has none - which is why reading the
-  vault, as an earlier attempt at this feature did, could only ever answer "unsupported" on a real Galaxy.
-  Instead it reads the two inputs the vault is built from, both public API: the lock-screen credential
-  through `KeyguardManager`, and Samsung's maintenance mode through the Settings provider. Green means
-  download mode is not gated, red means it is, and grey means this device does not gate download mode at all
-  - which is also what a non-Samsung device now gets instead of a pill that vanished, so the control is
-  always there to explain itself. Tapping it opens a submenu of the three facts behind the dot - Lockscreen
-  Yes/No, Maintenance Mode On/Off, Device Supported/Unsupported - in the same card as the overflow menu,
-  which beats a coloured dot you have to argue with by cable; the same line still goes to logcat.
-  `at_command` is the one input an app cannot read; it is assumed cleared, which is what it is after every
-  boot unless a service tool has just authorised the device, and that can only make the dot too pessimistic,
-  never too optimistic.
-- No more toasts. Nothing in this app should be announced over the bottom of the screen for a second and
-  then vanish: resetting the layout, flipping the KSU modules switch, tapping a manager that cannot be
-  launched. The modules switch already says what it did in its own subtitle, the reset is visible in the
-  stack itself, and the two that looked like errors cannot strand the user - the manager launcher is only lit
-  when there is something to launch, and a manager with no launchable activity goes to logcat.
-- The version number is out of the header and the update announcement has taken its place. The header is the
-  app's name, the **Odin** control and the menu button; when the release check comes back with something newer,
-  a lime capsule wipes in from the left edge over the word **DirtyFrag** and reads **Update**, one tap from the
-  release page. What it replaces is a small pill over the version digits, drawn inside the title's own text
-  line: 10.8sp next to a 24sp word is not readable at arm's length, and it reserved its width from the first
-  frame whether or not an update was flagged, which with the wider Odin pill beside it left the title ellipsized
-  - "DirtyFrag…", version pill and all. A span cannot be the 44dp module everything else in the header is, so
-  the announcement is a View now, with 24dp of air on each side of its word: 158.9dp measured on a Galaxy S25
-  (SM-S931B), left edge on the headline's own, 54dp still clear of the Odin pill. An up to date header pays
-  nothing for it - the pill does not exist until the check answers, and the title no longer shares its line with
-  anything it has to make room for. The version is not lost, only relocated: `version <x>` to logcat on every
-  start, `app version: <x>` in the run log.
+### Diagnostics
+- Run markers moved out of `/dev` to `/data/user_de/0/df.root/markers/`. `/dev` is a vendor tmpfs the
+  app cannot read back, so those markers were write-only and a stale one was indistinguishable from a
+  device node. The libc++ one-shot mutex at `/dev/df` stays where it is: it is a mutex, not a marker.
+- Every marker and log is chowned with **both** uid and gid to the app before use. A uid-only chown
+  left the group as root, which is how markers ended up unreadable by the app that asked for them.
+- Logs are per run: `/data/user_de/0/df.root/daemon/run-<trigger>-<timestamp>.log`, with the daemon's
+  own step trace folded in at the same level of detail, plus `last-run.log` for the UI. Finding the
+  failing step no longer means reproducing the run.
 
 ### Managers
 - zandatsu07's KernelSU-Next is no longer listed as a Samsung manager, following upstream: it only
   worked on S23 and below with kernel 5.15, so it is dropped from the list until it works on every
   Samsung device. diabl0w's KernelSU stays the Samsung manager and the non-Samsung list is unchanged.
-
-### Fixed - unsafe getprop fallback
-Upstream added a fallback for kernels that leave the Android version out of `uname -r`, reading
-`ro.vendor.build.version.release`. It never checked the `popen()` result and rebuilt the version string
-with `sprintf` into a 15 byte stack buffer from a 5 byte read, so a long or non-numeric property
-overflowed it. The property is now read into a zero-initialised buffer and only a leading integer is
-accepted, which is all the caller wants. The same hardening shipped in
-[k10halifa/Dslice](https://github.com/k10halifa/Dslice).
-
-### Built
-- The eight embedded kernel modules are rebuilt by CI from this source and committed, so the APK carries
-  exactly this engine.
-- The bundled Inter variable font is subset down to the glyphs the app can render: 2,937 glyphs and 2,852
-  codepoints become 829 and 427, 879,708 bytes become 239,308, and that takes **332,804 bytes out of the
-  APK** - 2.26 MB down to 1.93 MB, about a seventh of the download. It is the same font: Inter carries no
-  hinting tables at all, so a subset cannot change how a surviving glyph rasterises, and that was checked
-  rather than assumed - both fonts were instantiated at the two weights `res/font/inter.xml` declares and
-  every contour coordinate and advance width compared over 86 characters, which is every character the app
-  can put on screen, at zero differences. Both variation axes and all nine named instances are kept, and the
-  only OpenType features dropped are the ones that are off unless something asks for them (stylistic sets,
-  `cv01`-`cv14`, `ss01`-`ss08`, `dlig`, `frac`, `aalt`, ...). What is left covers Basic Latin, Latin-1,
-  combining marks, general punctuation, arrows, geometric shapes and dingbats. Anything outside that is not
-  lost: Android falls back per character, so a Cyrillic module description renders in the system font the
-  way emoji already did. `tools/subset_font.py` regenerates it, with `--latin-only` and `--wide` presets if
-  the coverage needs to move either way.
-- `android:debuggable="true"` is gone from the manifest, where upstream has carried it since its first
-  commit. It is not free: a debuggable APK can be `run-as` and ptraced by anything that has adb, which for
-  this app means readable preferences - the chosen SU manager, the module and autorun switches - and an
-  injectable process sitting next to an exploit. Nothing in the app needs it and no code path reaches for a
-  hidden API, so removing it changes no behaviour. Debug builds are still debuggable, because the debug
-  build type does that on its own.
 
 ## 1.15
 

@@ -1,8 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Colours are defined in Compose now (MiuixTheme, via DfTheme), so the palette
+  that used to live here is gone along with the View-based UI that read it.
+
+  This file is kept only for the launcher icon background: it is a <color>, not
+  a @drawable, and is the fallback used where a flat colour is needed rather
+  than the vector.
+-->
 <resources>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
-    <!-- Dark backdrop for the white grenade. Was #FF1C1B1F - the Material 3
-         DARK SURFACE hex, which carries a purple bias (B > R,G). Neutral now. -->
+    <!-- Dark backdrop for the white grenade. Neutral: the Material 3 dark
+         surface hex (#FF1C1B1F) carries a purple bias (B > R,G). -->
     <color name="ic_launcher_background">#FF1C1C1C</color>
 </resources>

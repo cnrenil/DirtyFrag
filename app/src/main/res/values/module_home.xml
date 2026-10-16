@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ui_modules_home_title">Script modules</string>
+    <string name="ui_modules_home_summary">Configure providers and run enabled modules in order from the Script modules tab. The daemon is independent of manager loading.</string>
+    <string name="ui_modules_daemon_ready">Daemon channel ready</string>
+    <string name="ui_modules_failure_hint">The previous plan failed. Automatic execution has been disabled; review the module log before retrying.</string>
+    <string name="ui_modules_running_hint">Running enabled modules in order. A failure stops the remaining modules.</string>
+    <string name="ui_modules_run_plan">Run module plan</string>
+</resources>

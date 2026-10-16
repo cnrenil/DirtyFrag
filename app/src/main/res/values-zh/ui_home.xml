@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="nav_home">首页</string>
+    <string name="home_subtitle">Root 状态与设备概览</string>
+    <string name="home_manager_group">SU 管理器</string>
+    <string name="home_kernel_group">内核概览</string>
+    <string name="home_log_group">执行日志</string>
+    <string name="home_open_manager">打开管理器</string>
+    <string name="home_running_hint">正在执行，请保持应用打开并等待完成。</string>
+    <string name="home_rooted_hint">Root 已可用。打开管理器以管理授权。</string>
+    <string name="home_failed_hint">再次尝试前需要重启设备。请查看下方执行日志。</string>
+    <string name="home_pick_hint">请先在下方选择 SU 管理器，以启用执行操作。</string>
+    <string name="home_confirm_hint">点击「确认执行」，使用当前配置开始运行。</string>
+    <string name="home_ready_hint">已选择 SU 管理器，可以开始运行。</string>
+    <string name="home_confirm_run">确认执行</string>
+    <string name="home_log_empty">暂无执行日志。开始运行后，输出会显示在这里。</string>
+    <string name="manager_picker_summary">选择提供兼容 SU 库的已安装应用。</string>
+</resources>

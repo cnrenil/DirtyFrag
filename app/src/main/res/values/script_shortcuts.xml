@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shortcut_clean_markers">Clean run markers</string>
+    <string name="shortcut_unload_module">Unload dfroot module</string>
+    <string name="shortcut_cleanup">Unload module and clean markers</string>
+    <string name="shortcut_pick_manager">Select an SU manager before generating late-load commands.</string>
+</resources>

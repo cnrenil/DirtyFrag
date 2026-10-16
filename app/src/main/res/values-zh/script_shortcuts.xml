@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shortcut_clean_markers">清理运行标志</string>
+    <string name="shortcut_unload_module">卸载 dfroot 模块</string>
+    <string name="shortcut_cleanup">卸载模块并清理标志</string>
+    <string name="shortcut_pick_manager">请先选择 SU 管理器，再生成 late-load 命令。</string>
+</resources>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="menu_commands">Commands &amp; scripts</string>
+    <string name="commands_title">Commands &amp; scripts</string>
+    <string name="commands_back">Back</string>
+    <string name="commands_preload_title">Before late-load</string>
+    <string name="commands_preload_note">Runs as root immediately before the selected SU late-load (the actual insmod stage). Failure is logged but does not stop late-load.</string>
+    <string name="commands_postload_title">After late-load</string>
+    <string name="commands_postload_note">Runs as root immediately after a successful late-load, before optional soft reboot. Failure is logged but does not stop the run.</string>
+    <string name="commands_preload_enabled">Enabled for the next run: before late-load / insmod.</string>
+    <string name="commands_postload_enabled">Enabled for the next run: after late-load / insmod.</string>
+    <string name="commands_hook_disabled">Disabled: script is empty.</string>
+    <string name="commands_script_hint">One shell script. Lines starting with # are comments.</string>
+    <string name="commands_save">Save</string>
+    <string name="commands_clear">Clear</string>
+    <string name="commands_run_script">Run as app</string>
+    <string name="commands_saved">Script saved</string>
+    <string name="commands_save_failed">Save failed: %1$s</string>
+    <string name="commands_terminal_title">Shell</string>
+    <string name="commands_terminal_note">Runs through /system/bin/sh. Before root this uses the app UID; after root, use your SU command if your manager exposes one.</string>
+    <string name="commands_terminal_hint">Command</string>
+    <string name="commands_run">Run command</string>
+    <string name="commands_running">Running…</string>
+    <string name="commands_output_empty">No output</string>
+</resources>

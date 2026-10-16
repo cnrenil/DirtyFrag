@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="nav_home">Home</string>
+    <string name="home_subtitle">Root status and device overview</string>
+    <string name="home_manager_group">SU manager</string>
+    <string name="home_kernel_group">Kernel overview</string>
+    <string name="home_log_group">Execution log</string>
+    <string name="home_open_manager">Open manager</string>
+    <string name="home_running_hint">Keep the app open while the current operation completes.</string>
+    <string name="home_rooted_hint">Root is available. Open your manager to manage access.</string>
+    <string name="home_failed_hint">Restart the device before trying again. See the execution log below.</string>
+    <string name="home_pick_hint">Choose an SU manager below to enable execution.</string>
+    <string name="home_confirm_hint">Tap Confirm execution to start with the current configuration.</string>
+    <string name="home_ready_hint">Your SU manager is selected. Ready to run.</string>
+    <string name="home_confirm_run">Confirm execution</string>
+    <string name="home_log_empty">No execution log yet. Output will appear here when you run.</string>
+    <string name="manager_picker_summary">Choose an installed app that supplies a supported SU library.</string>
+</resources>

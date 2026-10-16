@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ui_scripts_entry_summary">排序模块、配置管理器与导入 SH 脚本</string>
+    <string name="ui_scripts_title">脚本模块</string>
+    <string name="ui_scripts_back">返回</string>
+    <string name="ui_scripts_description">两种脚本默认均关闭。脚本使用当前可用的最高权限，但不保证拥有 root 权限。手动运行会执行已保存的脚本，不受开关状态影响。</string>
+    <string name="ui_scripts_app_open_group">应用启动</string>
+    <string name="ui_scripts_boot_group">设备启动</string>
+    <string name="ui_scripts_app_open_summary">每次全新启动 Activity 时执行一次；配置变化引起的界面重建不会重复执行。</string>
+    <string name="ui_scripts_boot_summary">由脚本启动接收器执行，独立于 root 自动运行。若启用 root 自动运行，脚本会在其完成后执行。</string>
+    <string name="ui_scripts_edit">编辑脚本</string>
+    <string name="ui_scripts_empty">尚未保存命令</string>
+    <string name="ui_scripts_saved">已保存命令，可编辑或手动运行</string>
+    <string name="ui_scripts_run">立即运行已保存脚本</string>
+    <string name="ui_scripts_output_group">输出与最新日志</string>
+    <string name="ui_scripts_no_log">暂无输出或脚本日志</string>
+    <string name="ui_scripts_refresh">查看最新日志</string>
+    <string name="ui_scripts_editor_title">编辑脚本</string>
+    <string name="ui_scripts_editor_summary">选择预设仅替换编辑框中的草稿。保存后才会生效；取消不会修改已保存脚本。</string>
+    <string name="ui_scripts_preset">插入预设</string>
+    <string name="ui_scripts_editor_hint">Shell 命令</string>
+    <string name="ui_scripts_invalid">脚本的 UTF-8 大小不得超过 32 KiB，且不能包含 NUL 字符。</string>
+    <string name="ui_scripts_cancel">取消</string>
+    <string name="ui_scripts_save">保存</string>
+    <string name="ui_scripts_error">操作失败</string>
+    <string name="ui_scripts_busy">正在处理…</string>
+    <string name="ui_scripts_exit">退出码</string>
+    <string-array name="ui_scripts_triggers">
+        <item>启动应用时运行</item>
+        <item>开机后运行</item>
+    </string-array>
+    <string-array name="ui_scripts_presets">
+        <item>选择预设</item>
+        <item>诊断信息</item>
+        <item>延迟加载</item>
+        <item>清理标记</item>
+        <item>卸载模块</item>
+        <item>清理</item>
+    </string-array>
+</resources>

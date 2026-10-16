@@ -4,11 +4,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-// argv[0] = program name
-// argv[1] = file offset (decimal string)
-// argv[2] = file path
-// argv[3] = optional "r" — read mode: write 16 bytes of file content to fd 0 (OUT_FD)
-//           if absent — splice mode: splice 16 bytes of file page into fd 1 (PIPE_FD)
+// argv: <offset> <path> ["r"]. Read mode writes 16 bytes of file content to
+// fd 0; otherwise splices 16 bytes of the file page into fd 1.
 
 #define OUT_FD  0
 #define PIPE_FD 1

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="terminal_banner">DirtyFrag 终端 — 命令使用当前可用的最高权限执行。</string>
+    <string name="terminal_app_privilege">应用</string>
+    <string name="terminal_transport">权限：%1$s — %2$s</string>
+    <string name="terminal_privilege_changed">权限：%1$s</string>
+    <string name="terminal_running_status">%1$s · 正在执行…</string>
+    <string name="terminal_id_empty">id 无输出 (exit=%1$d)</string>
+    <string name="terminal_failure">命令失败：%1$s</string>
+    <string name="terminal_daemon_unreachable">daemon 不可达，无法执行 %1$s。请检查权限标识。</string>
+    <string name="terminal_log_fallback">无法直接读取 %1$s。\n\ndaemon 状态：\n%2$s</string>
+    <string name="terminal_clear">清空输出</string>
+    <string name="terminal_copy_all">复制全部输出</string>
+    <string name="terminal_paste">粘贴</string>
+    <string name="terminal_history_previous">上一条</string>
+    <string name="terminal_history_next">下一条</string>
+    <string name="terminal_shortcuts">命令快捷方式</string>
+    <string name="terminal_choose_shortcut">选择命令</string>
+    <string name="terminal_modules">模块</string>
+    <string name="terminal_logs">日志</string>
+    <string name="terminal_hint">输入命令</string>
+    <string name="terminal_run">执行</string>
+</resources>

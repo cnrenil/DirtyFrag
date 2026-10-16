@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ui_settings_title">Settings</string>
+    <string name="ui_settings_appearance">Appearance</string>
+    <string name="ui_settings_color_mode">Color mode</string>
+    <string name="ui_settings_key_color">Key color</string>
+    <string name="ui_settings_palette">Palette style</string>
+    <string name="ui_settings_logs">Logs</string>
+    <string name="ui_settings_modules">KernelSU modules</string>
+    <string name="ui_settings_modules_enabled">Enabled — applies after reboot</string>
+    <string name="ui_settings_modules_disabled">Disabled — applies after reboot</string>
+    <string name="ui_settings_advanced_log">Advanced log</string>
+    <string name="ui_settings_advanced_log_summary">Show the full execution log on Home</string>
+    <string name="ui_settings_expert">Expert mode</string>
+    <string name="ui_settings_expert_summary">Enable boot automation controls</string>
+    <string name="ui_settings_autorun">Run after boot</string>
+    <string name="ui_settings_autorun_summary">Requires expert mode; runs automatically after boot</string>
+    <string name="ui_settings_reboot">Automatic soft reboot</string>
+    <string name="ui_settings_reboot_summary">Soft reboot after root when boot automation is enabled</string>
+    <string name="ui_settings_kernel">Kernel &amp; vermagic</string>
+    <string name="ui_settings_branch">KMI branch</string>
+    <string name="ui_settings_kernel_auto">Automatic (%1$s)</string>
+    <string name="ui_settings_vermagic">Vermagic source</string>
+    <string name="ui_settings_edit_custom">Edit custom vermagic</string>
+    <string name="ui_settings_resolved">Resolved vermagic</string>
+    <string name="ui_settings_builtin_summary">Use the bundled module value unchanged</string>
+    <string name="ui_settings_device">Device</string>
+    <string name="ui_settings_model">Model</string>
+    <string name="ui_settings_android">Android</string>
+    <string name="ui_settings_android_value">%1$s (API %2$d)</string>
+    <string name="ui_settings_patch">Security patch</string>
+    <string name="ui_settings_release">Kernel release</string>
+    <string name="ui_settings_arch">Architecture</string>
+    <string name="ui_settings_detected">Detected KMI</string>
+    <string name="ui_settings_unknown">Unknown / unavailable</string>
+    <string name="ui_settings_about">About</string>
+    <string name="ui_settings_version">Version</string>
+    <string name="ui_settings_updates">Updates</string>
+    <string name="ui_settings_update_available">Update available — open GitHub</string>
+    <string name="ui_settings_update_summary">View releases on GitHub</string>
+    <string name="ui_settings_github">GitHub</string>
+    <string name="ui_settings_github_summary">Source code and project information</string>
+    <string name="ui_settings_custom_title">Custom vermagic</string>
+    <string name="ui_settings_custom_summary">Enter the complete module vermagic. Changes apply only after confirmation.</string>
+    <string name="ui_settings_custom_hint">Complete vermagic string</string>
+    <string name="ui_settings_custom_invalid">Enter a nonempty value without newlines or NUL characters.</string>
+    <string name="ui_settings_cancel">Cancel</string>
+    <string name="ui_settings_confirm">Use value</string>
+    <string-array name="ui_settings_color_modes">
+        <item>Follow system</item><item>Light</item><item>Dark</item>
+        <item>Monet · follow system</item><item>Monet · light</item><item>Monet · dark</item>
+    </string-array>
+    <string-array name="ui_settings_key_colors">
+        <item>Blue</item><item>Green</item><item>Purple</item><item>Yellow</item>
+        <item>Orange</item><item>Pink</item><item>Teal</item>
+    </string-array>
+    <string-array name="ui_settings_palette_styles">
+        <item>Tonal spot</item><item>Neutral</item><item>Vibrant</item><item>Expressive</item>
+        <item>Rainbow</item><item>Fruit salad</item><item>Monochrome</item><item>Fidelity</item><item>Content</item>
+    </string-array>
+    <string-array name="ui_settings_vermagic_modes">
+        <item>Built-in module value</item><item>Vivo</item><item>Standard Android</item><item>Custom</item>
+    </string-array>
+    <string name="ui_settings_navigation">Navigation and toolbars</string>
+    <string name="ui_settings_floating_navigation">Floating bottom bar</string>
+    <string name="ui_settings_floating_navigation_note">Use the Miuix floating style instead of the standard bottom bar.</string>
+    <string name="ui_settings_floating_navigation_style">Floating bar style</string>
+    <string name="ui_settings_top_bar">Top bar style</string>
+    <string name="ui_settings_bar_blur">Blur toolbar backgrounds</string>
+    <string name="ui_settings_bar_blur_note">Blur content behind top and bottom bars. Unsupported devices use solid backgrounds.</string>
+    <string-array name="ui_settings_floating_navigation_styles">
+        <item>Miuix floating</item>
+        <item>iOS-like liquid glass</item>
+    </string-array>
+    <string-array name="ui_settings_top_bar_styles">
+        <item>Large title (collapses on scroll)</item>
+        <item>Compact</item>
+        <item>Floating</item>
+    </string-array>
+</resources>

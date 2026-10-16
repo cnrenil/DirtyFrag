@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="terminal_banner">DirtyFrag terminal — commands use the best available privilege.</string>
+    <string name="terminal_app_privilege">App</string>
+    <string name="terminal_transport">Privilege: %1$s — %2$s</string>
+    <string name="terminal_privilege_changed">Privilege: %1$s</string>
+    <string name="terminal_running_status">%1$s · Running…</string>
+    <string name="terminal_id_empty">id returned no output (exit=%1$d)</string>
+    <string name="terminal_failure">Command failed: %1$s</string>
+    <string name="terminal_daemon_unreachable">Daemon unreachable; cannot execute %1$s. Check the privilege indicator.</string>
+    <string name="terminal_log_fallback">Cannot read %1$s directly.\n\nDaemon status:\n%2$s</string>
+    <string name="terminal_clear">Clear output</string>
+    <string name="terminal_copy_all">Copy all output</string>
+    <string name="terminal_paste">Paste</string>
+    <string name="terminal_history_previous">Previous</string>
+    <string name="terminal_history_next">Next</string>
+    <string name="terminal_shortcuts">Command shortcuts</string>
+    <string name="terminal_choose_shortcut">Choose a command</string>
+    <string name="terminal_modules">Modules</string>
+    <string name="terminal_logs">Logs</string>
+    <string name="terminal_hint">Enter a command</string>
+    <string name="terminal_run">Run</string>
+</resources>

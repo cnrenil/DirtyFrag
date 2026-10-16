@@ -3,6 +3,7 @@
 .project
 .settings/
 .gradle/
+.kotlin/
 *.iml
 .idea/
 build/
@@ -38,4 +39,5 @@ app/src/main/jni/ko/*.ko
 
 # staged release APK for the GitHub release asset
 /release/
-__pycache__/
+# local Gradle user home
+.gradle-home/
